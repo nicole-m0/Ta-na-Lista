@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Tá na Lista!",
+    "slug": "ta-na-lista",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "tanalista",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
+    "android": {
+      "package": "com.tanalista.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#21834B"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-status-bar"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
