@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Repository, migrate, validateProduct } from '../src/db/repository.ts';
+import { Repository, migrate, parseQuantity, validateProduct } from '../src/db/repository.ts';
 import type { Database } from '../src/db/repository.ts';
 
 function adapter(raw: DatabaseSync): Database {
@@ -50,6 +50,24 @@ test('invalid quantities, units and categories are rejected', () => {
   for (const quantity of [0, -1, NaN, Infinity, 100000]) assert.throws(() => validateProduct({ name: 'Arroz', quantity, unit: 'kg', category: null }));
   assert.throws(() => validateProduct({ name: '', quantity: 1, unit: 'kg', category: null }));
   assert.throws(() => validateProduct({ name: 'Arroz', quantity: 1, unit: 'inválida' as never, category: null }));
+  assert.throws(() => validateProduct({ name: 'Arroz', quantity: 1, unit: 'kg', category: 'inválida' as never }));
+});
+test('quantity input accepts decimals and rejects non-decimal notation', () => {
+  assert.equal(parseQuantity(' 1,5 '), 1.5);
+  assert.equal(parseQuantity('2.75'), 2.75);
+  assert.equal(parseQuantity('1'), 1);
+  for (const input of ['', ' ', '0x10', '1e3', '1,2.3', 'abc', 'Infinity']) assert.throws(() => parseQuantity(input));
+});
+test('newer database versions are refused before any write or configuration change', async () => {
+  const raw = new DatabaseSync(':memory:');
+  try {
+    raw.exec("PRAGMA user_version = 2; CREATE TABLE preserved (value TEXT); INSERT INTO preserved VALUES ('original');");
+    const db = adapter(raw);
+    db.execAsync = async () => { assert.fail('A newer database must not be modified'); };
+    await assert.rejects(migrate(db), /mais recente/);
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 2);
+    assert.equal(raw.prepare('SELECT value FROM preserved').get()?.value, 'original');
+  } finally { raw.close(); }
 });
 test('failed duplicate rolls back completely and preserves original', async () => {
   const raw = new DatabaseSync(':memory:'); const db = adapter(raw); await migrate(db);

@@ -2,7 +2,7 @@ import { useRef, useState, type ComponentRef } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { categories, units } from '../types/models';
 import type { Product, ProductInput } from '../types/models';
-import { validateProduct } from '../db/repository';
+import { parseQuantity, validateProduct } from '../db/repository';
 import { Action, Sheet, s } from './ui';
 import { colors as c } from '../theme';
 
@@ -12,8 +12,8 @@ export function ProductForm({ product, close, save }: { product?: Product; close
   const [error, setError] = useState(''); const [busy, setBusy] = useState(false); const [feedback, setFeedback] = useState(''); const input = useRef<ComponentRef<typeof TextInput>>(null);
   async function submit(another: boolean) {
     if (busy) return;
-    const data = { name, quantity: Number(quantity.trim().replace(',', '.')), unit, category };
-    try { validateProduct(data); } catch (e) { setError((e as Error).message); return; }
+    let data: ProductInput;
+    try { data = validateProduct({ name, quantity: parseQuantity(quantity), unit, category }); } catch (e) { setError((e as Error).message); return; }
     try { setBusy(true); setError(''); await save(data);
       if (another) { setName(''); setQuantity('1'); setFeedback(`${data.name.trim()} adicionado!`); setBusy(false); requestAnimationFrame(() => input.current?.focus()); }
       else close();

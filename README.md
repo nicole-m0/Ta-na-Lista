@@ -21,6 +21,39 @@ npm.cmd run android
 
 O acesso à rede serve ao carregamento do ambiente de desenvolvimento. Listas e produtos usam SQLite no dispositivo e não fazem solicitações de rede. Para validar inicialização totalmente offline, use uma build Android local de desenvolvimento/release instalada; o Expo Go depende do Metro para recarregar o código durante desenvolvimento. A distribuição nativa não foi gerada nesta etapa.
 
+## Development Build no Android
+
+O projeto inclui `expo-dev-client` compatível com SDK 58 e um perfil `development` em `eas.json`, com distribuição interna e saída APK. O identificador Android continua `com.tanalista.app`; nenhuma funcionalidade ou esquema SQLite foi alterado.
+
+Na verificação deste computador, Java/JDK e ADB não foram encontrados no PATH, as variáveis JAVA_HOME/ANDROID_HOME/ANDROID_SDK_ROOT estavam ausentes e Android Studio/SDK/JDK não foram encontrados nas pastas usuais ou nos registros de instalação consultados. Não foi instalada nenhuma ferramenta nativa, não foi gerada a pasta `android` e nenhuma compilação foi iniciada.
+
+O caminho mais simples é o EAS Build na nuvem, sujeito à cota gratuita e à fila do plano Free. É necessário ter uma conta Expo e vincular o projeto. Os comandos abaixo são próximos passos, ainda não executados:
+
+```powershell
+npx.cmd eas-cli@latest login
+npx.cmd eas-cli@latest init
+```
+
+Após conferir a conta e a vinculação, o comando seguinte **envia o código ao EAS e inicia a compilação nativa na nuvem**; não publica na Play Store:
+
+```powershell
+npx.cmd eas-cli@latest build --platform android --profile development
+```
+
+Na primeira build, o EAS pode pedir para gerar uma chave de assinatura Android. Ao terminar, abra o link de instalação no celular, baixe o APK e autorize a instalação para o navegador usado. Não é necessário ADB, cabo USB ou Android Studio para essa opção. Não desinstale uma instalação existente para resolver diferenças de assinatura sem antes preservar seus dados.
+
+Com a build instalada, mantenha computador e celular na mesma rede e execute:
+
+```powershell
+npm.cmd run start:dev
+```
+
+Abra o Tá na Lista! instalado e leia o QR code com o cliente de desenvolvimento; não use Expo Go. O servidor Metro continua necessário durante o desenvolvimento. Alterações em dependências nativas ou configuração nativa exigem uma nova build. O SQLite desta instalação é separado dos dados anteriormente usados no Expo Go.
+
+Alternativa local: instalar/configurar Android Studio, Android SDK e JDK compatíveis, habilitar depuração USB e usar `npx.cmd expo run:android --device`. Essa alternativa exige downloads maiores e não foi preparada no Windows nesta etapa.
+
+Referências: [Development Builds](https://docs.expo.dev/develop/development-builds/introduction/), [configuração EAS](https://docs.expo.dev/build/eas-json/) e [limites atuais do plano gratuito](https://expo.dev/pricing).
+
 ## Funcionalidades
 
 - Tela inicial com identidade verde, saudação, criação de listas, datas, contagem e progresso.
@@ -87,7 +120,9 @@ npx.cmd expo install --check
 npx.cmd expo export --platform android
 ```
 
-Resultado desta entrega: typecheck e lint aprovados, 3 testes aprovados, `expo install --check` sem incompatibilidades e bundle Android exportado com sucesso. A exportação é apenas local, sem publicação.
+Resultado da retomada: typecheck e lint aprovados, 5 testes aprovados, `expo-doctor` com 20/20 verificações aprovadas, `expo install --check` sem incompatibilidades e bundle Android exportado com sucesso. A exportação é apenas local, sem publicação.
+
+Na análise inicial, o Git estava limpo e todas as funcionalidades básicas acima já estavam implementadas. Foram corrigidas a aceitação de notações não decimais na quantidade (como `0x10` e `1e3`) e a ordem da migração, que agora recusa bancos de versão superior antes de alterar configurações. Foram acrescentados testes de regressão e validação de categoria inválida. O `expo-doctor` identificou `expo-font` como dependência obrigatória ausente de `@expo/vector-icons`; o pacote compatível e seu plugin foram adicionados pelo instalador oficial do Expo.
 
 Os testes verificam criação, renomeação, edição/remoção de produtos, marcar/desmarcar, progresso, duplicação com reset, IDs diferentes, exclusão em cascata, campos inválidos, gravações concorrentes serializadas, banco vazio, migração repetida, persistência após fechar/reabrir SQLite e rollback de falha ao duplicar. O SQLite do Node 22 emite aviso de API experimental; é usado apenas nos testes, não no app.
 

@@ -17,15 +17,20 @@ CREATE INDEX products_list ON products(listId);
 PRAGMA user_version = 1;`;
 
 export async function migrate(db: Database) {
-  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   const version = await db.getFirstAsync<{ user_version: number }>('PRAGMA user_version');
   if ((version?.user_version ?? 0) > 1) throw new Error('Este banco foi atualizado por uma versão mais recente. Atualize o aplicativo.');
+  await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   if (!version?.user_version) await db.withTransactionAsync(() => db.execAsync(schema));
 }
 export function validName(value: string) {
   const name = value.trim();
   if (!name || name.length > 80) throw new Error('Informe um nome com 1 a 80 caracteres.');
   return name;
+}
+export function parseQuantity(value: string): number {
+  const normalized = value.trim();
+  if (!/^\d+(?:[.,]\d+)?$/.test(normalized)) throw new Error('Informe uma quantidade decimal, como 1 ou 1,5.');
+  return Number(normalized.replace(',', '.'));
 }
 export function validateProduct(input: ProductInput): ProductInput {
   const name = validName(input.name);
