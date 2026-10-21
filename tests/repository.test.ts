@@ -78,3 +78,41 @@ test('failed duplicate rolls back completely and preserves original', async () =
     await assert.rejects(broken.duplicate(id)); assert.equal((await repo.lists()).length, 1); assert.equal((await repo.products(id)).length, 1);
   } finally { raw.close(); }
 });
+
+test('original insertion order survives timestamp ties and duplication', async () => {
+  const raw = new DatabaseSync(':memory:'); const db = adapter(raw); await migrate(db);
+  try {
+    const ids = ['list', 'z', 'a', 'copy', 'y', 'b'];
+    const repo = new Repository(db, () => ids.shift()!);
+    const id = await repo.create('Ordem');
+    for (const name of ['Primeiro', 'Segundo']) await repo.saveProduct(id, { name, quantity: 1, unit: 'unidade', category: null });
+    raw.exec("UPDATE products SET createdAt='2026-01-01'");
+    assert.deepEqual((await repo.products(id)).map(p => p.name), ['Primeiro', 'Segundo']);
+    const copy = await repo.duplicate(id);
+    assert.deepEqual((await repo.products(copy)).map(p => p.name), ['Primeiro', 'Segundo']);
+    assert.ok((await repo.products(copy)).every(p => p.purchased === 0));
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 1);
+  } finally { raw.close(); }
+});
+test('frequent suggestions use local history, merge names and keep latest details', async () => {
+  const raw = new DatabaseSync(':memory:'); const db = adapter(raw); await migrate(db);
+  try {
+    const repo = new Repository(db, randomUUID);
+    assert.deepEqual(await repo.frequentProducts(), []);
+    const id = await repo.create('Semana');
+    await repo.saveProduct(id, { name: 'Arroz', quantity: 1, unit: 'kg', category: 'Mercearia' });
+    await repo.saveProduct(id, { name: 'Banana', quantity: 1, unit: 'kg', category: 'Hortifruti' });
+    const other = await repo.create('Mês');
+    await repo.saveProduct(other, { name: 'ARROZ', quantity: 2, unit: 'pacote', category: 'Mercearia' });
+    const suggestions = await repo.frequentProducts();
+    assert.equal(suggestions.length, 2);
+    assert.equal(suggestions[0]?.name, 'ARROZ');
+    assert.equal(suggestions[0]?.quantity, 2);
+    assert.equal(suggestions[0]?.unit, 'pacote');
+    await repo.remove(other);
+    assert.equal((await repo.frequentProducts())[0]?.quantity, 1);
+    await assert.rejects(repo.duplicate('missing'));
+    await repo.saveProduct(id, { name: 'Leite', quantity: 1, unit: 'litro', category: null });
+    assert.equal((await repo.products(id)).length, 3);
+  } finally { raw.close(); }
+});

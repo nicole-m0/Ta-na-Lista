@@ -35,6 +35,7 @@ export const s = StyleSheet.create({
   card: { backgroundColor: c.white, borderRadius: 22, padding: 20, gap: 18, borderWidth: 1, borderColor: c.border },
   track: { height: 5, backgroundColor: c.pale, borderRadius: 5, overflow: 'hidden' },
   empty: { paddingVertical: 40, paddingHorizontal: 18, alignItems: 'center', gap: 16 }, emptyIcon: { backgroundColor: c.pale, borderRadius: 26, padding: 24, marginBottom: 8 },
+  filter: { minHeight: 48, padding: 12, justifyContent: 'center', borderRadius: 14, backgroundColor: c.white, borderWidth: 1, borderColor: c.border },
   input: { backgroundColor: c.background, borderWidth: 1, borderColor: c.border, borderRadius: 14, minHeight: 54, padding: 15, fontSize: 17, color: c.text },
   label: { fontSize: 14, fontWeight: '700', color: c.text }, error: { color: c.danger, fontSize: 14, lineHeight: 21 },
   overlay: { flex: 1, backgroundColor: '#15281F80', justifyContent: 'flex-end' }, sheet: { backgroundColor: c.white, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, maxHeight: '92%', gap: 16, width: '100%', maxWidth: 680, alignSelf: 'center' },

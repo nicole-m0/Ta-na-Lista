@@ -56,7 +56,19 @@ export class Repository {
   }
   async products(id: string) {
     await this.pending;
-    return this.db.getAllAsync<Product>('SELECT * FROM products WHERE listId=? ORDER BY createdAt, id', id);
+    return this.db.getAllAsync<Product>('SELECT * FROM products WHERE listId=? ORDER BY createdAt, rowid', id);
+  }
+  async frequentProducts() {
+    await this.pending;
+    const products = await this.db.getAllAsync<Product>('SELECT * FROM products ORDER BY updatedAt DESC, rowid DESC');
+    const grouped = new Map<string, { product: Product; count: number }>();
+    for (const product of products) {
+      const key = product.name.trim().toLocaleLowerCase('pt-BR');
+      const entry = grouped.get(key);
+      if (entry) entry.count++;
+      else grouped.set(key, { product, count: 1 });
+    }
+    return [...grouped.values()].sort((a, b) => b.count - a.count).slice(0, 8).map(entry => entry.product);
   }
   create(name: string) {
     return this.write(async () => {
@@ -75,7 +87,7 @@ export class Repository {
         const source = await this.db.getFirstAsync<ShoppingList>('SELECT * FROM lists WHERE id=?', id);
         if (!source) throw new Error('A lista não foi encontrada.');
         await this.db.runAsync('INSERT INTO lists VALUES (?,?,?,?)', copyId, `${source.name.slice(0,72)} (cópia)`, now, now);
-        const products = await this.db.getAllAsync<Product>('SELECT * FROM products WHERE listId=?', id);
+        const products = await this.db.getAllAsync<Product>('SELECT * FROM products WHERE listId=? ORDER BY createdAt, rowid', id);
         for (const p of products) await this.db.runAsync('INSERT INTO products VALUES (?,?,?,?,?,?,0,?,?)', this.uuid(), copyId, p.name, p.quantity, p.unit, p.category, now, now);
       });
       return copyId;

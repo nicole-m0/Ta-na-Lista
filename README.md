@@ -1,4 +1,6 @@
-# Tá na Lista! · Etapa 1
+# Tá na Lista! · Etapa 2
+
+Retomada de 21/10/2026: busca local, organização por ordem original/pendentes/categorias e sugestões locais de produtos foram acrescentadas. A Development Build já foi instalada e testada no Android pelo usuário; os trechos sobre preparação da primeira build abaixo são o registro da etapa anterior. Consulte [o relatório da Etapa 2](RELATORIO-ETAPA-2.md) para o estado atual, verificações e roteiro de teste. Nenhuma build ou publicação foi feita nesta retomada.
 
 Aplicativo Android de listas de compras, local e offline. Sem conta, servidor, dados demonstrativos ou funcionalidades Premium. Nenhum deploy ou publicação foi realizado.
 
