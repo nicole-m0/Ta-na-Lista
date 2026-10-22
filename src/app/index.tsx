@@ -8,15 +8,19 @@ import type { ShoppingList } from '../types/models';
 import { Action, Empty, IconButton, Progress, Sheet, s } from '../components/ui';
 import { ListNameForm } from '../components/ListNameForm';
 import { AdBanner } from '../components/AdBanner';
+import { AdsPrivacyOptions } from '../components/AdsPrivacyOptions';
 import { colors as c } from '../theme';
 
 export default function Home() {
+  const [focused, setFocused] = useState(false);
+  useFocusEffect(useCallback(() => { setFocused(true); return () => setFocused(false); }, []));
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const store = useStore(); const [lists, setLists] = useState<ShoppingList[]>([]); const [loading, setLoading] = useState(true);
   const [error, setError] = useState(''); const [form, setForm] = useState<{ id?: string; name: string }>();
   const [selected, setSelected] = useState<ShoppingList>();
   const refresh = useCallback(async () => { try { setLists(await store.lists()); setError(''); } catch { setError('Não foi possível carregar suas listas. Tente novamente.'); } finally { setLoading(false); } }, [store]);
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
-  async function mutate(task: () => Promise<unknown>) { try { await task(); await refresh(); } catch { Alert.alert('Não foi possível concluir', 'Seus dados foram preservados. Tente novamente.'); } }
+  async function mutate(task: () => Promise<unknown>) { try { await task(); await refresh(); } catch { setConfirmingDelete(true); Alert.alert('Não foi possível concluir', 'Tente novamente.', [{ text: 'OK', onPress: () => setConfirmingDelete(false) }], { cancelable: false }); } }
   function menu(list: ShoppingList) {
     setSelected(list);
   }
@@ -30,11 +34,11 @@ export default function Home() {
     </View>}
     ListEmptyComponent={loading ? <ActivityIndicator color={c.green} /> : !error ? <Empty title="Uma lista, muitas facilidades" detail="Da feira ao churrasco de domingo: crie sua primeira lista e deixe a memória descansar." /> : undefined}
     renderItem={({ item }) => <View style={s.card}><View style={s.between}><Pressable accessibilityRole="button" accessibilityLabel={`Abrir ${item.name}`} onPress={() => router.push({ pathname: '/list/[id]', params: { id: item.id } })} style={{ flex: 1, gap: 9, minHeight: 48 }}><Text style={s.sectionTitle}>{item.name}</Text><Text style={s.caption}>Criada em {new Date(item.createdAt).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</Text></Pressable><IconButton name="ellipsis-horizontal" label={`Opções de ${item.name}`} onPress={() => menu(item)} /></View><Progress total={item.total} purchased={item.purchased} /><Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/list/[id]', params: { id: item.id } })} style={[s.between, { minHeight: 44 }]}><Text style={{ color: c.green, fontWeight: '700' }}>{item.total > 0 && item.total === item.purchased ? 'Tudo comprado! Ver lista' : 'Abrir lista'}</Text><Ionicons name="arrow-forward" size={19} color={c.green} /></Pressable></View>}
-    ListFooterComponent={<View style={{ gap: 14 }}><Text style={[s.caption, { textAlign: 'center', fontSize: 12 }]}>Feita para simplificar o seu dia. Funciona offline.</Text><AdBanner /></View>} />
+    ListFooterComponent={<View style={{ gap: 40, paddingTop: 24 }}><Text style={[s.caption, { textAlign: 'center', fontSize: 12 }]}>Feita para simplificar o seu dia. Funciona offline.</Text>{focused && !form && !selected && !confirmingDelete && <AdBanner />}<AdsPrivacyOptions /></View>} />
     {selected && <Sheet visible title={selected.name} close={() => setSelected(undefined)}>
       <Action subtle title="Renomear lista" icon="pencil-outline" onPress={() => { setSelected(undefined); setForm({ id: selected.id, name: selected.name }); }} />
       <Action subtle title="Duplicar lista" icon="copy-outline" onPress={() => { const id = selected.id; setSelected(undefined); void mutate(() => store.duplicate(id)); }} />
-      <Action subtle title="Excluir lista" icon="trash-outline" onPress={() => { const list = selected; setSelected(undefined); Alert.alert('Excluir esta lista?', `“${list.name}” e todos os seus produtos serão excluídos.`, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir lista', style: 'destructive', onPress: () => void mutate(() => store.remove(list.id)) }]); }} />
+      <Action subtle title="Excluir lista" icon="trash-outline" onPress={() => { const list = selected; setConfirmingDelete(true); setSelected(undefined); Alert.alert('Excluir esta lista?', `“${list.name}” e todos os seus produtos serão excluídos.`, [{ text: 'Cancelar', style: 'cancel', onPress: () => setConfirmingDelete(false) }, { text: 'Excluir lista', style: 'destructive', onPress: () => { setConfirmingDelete(false); void mutate(() => store.remove(list.id)); } }], { cancelable: false }); }} />
     </Sheet>}
     {form && <ListNameForm initial={form.name} close={() => setForm(undefined)} save={async name => { if (form.id) await store.rename(form.id, name); else await store.create(name); await refresh(); }} />}
   </SafeAreaView>;

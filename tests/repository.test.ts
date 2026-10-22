@@ -52,6 +52,33 @@ test('invalid quantities, units and categories are rejected', () => {
   assert.throws(() => validateProduct({ name: 'Arroz', quantity: 1, unit: 'inválida' as never, category: null }));
   assert.throws(() => validateProduct({ name: 'Arroz', quantity: 1, unit: 'kg', category: 'inválida' as never }));
 });
+
+test('offline ads failure does not affect local CRUD or migration of existing data', async () => {
+  const raw = new DatabaseSync(':memory:'); const db = adapter(raw);
+  try {
+    await migrate(db); const repo = new Repository(db, randomUUID);
+    const id = await repo.create("Feira ' ; DROP TABLE lists; --");
+    await repo.saveProduct(id, { name: 'Arroz', quantity: 2, unit: 'kg', category: null });
+    const before = raw.prepare('SELECT * FROM products').all();
+    const { createAdsController } = await import('../src/services/ads.ts');
+    const controller = createAdsController({ gatherConsent: async () => { throw Error('offline'); }, showPrivacyOptionsForm: async () => { throw Error('offline'); }, initialize: async () => assert.fail('No SDK initialization offline') }, () => {});
+    await controller.start(); await migrate(db);
+    assert.deepEqual(raw.prepare('SELECT * FROM products').all(), before);
+    await repo.toggle((await repo.products(id))[0]!);
+    assert.equal((await repo.products(id))[0]?.purchased, 1);
+    assert.equal((await repo.lists()).length, 1);
+  } finally { raw.close(); }
+});
+
+test('orphaned data is reported without deleting or repairing it silently', async () => {
+  const raw = new DatabaseSync(':memory:'); const db = adapter(raw);
+  try {
+    await migrate(db);
+    raw.exec("PRAGMA foreign_keys=OFF; INSERT INTO products VALUES ('orphan','missing','Preservado',1,'kg',NULL,0,'now','now');");
+    await assert.rejects(migrate(db), /integridade/);
+    assert.equal(raw.prepare('SELECT name FROM products').get()?.name, 'Preservado');
+  } finally { raw.close(); }
+});
 test('quantity input accepts decimals and rejects non-decimal notation', () => {
   assert.equal(parseQuantity(' 1,5 '), 1.5);
   assert.equal(parseQuantity('2.75'), 2.75);

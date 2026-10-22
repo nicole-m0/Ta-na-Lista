@@ -1,4 +1,6 @@
-# Tá na Lista! · Etapa 2
+# Tá na Lista! · Etapa 3
+
+Estado atual: anúncios oficiais de teste com `react-native-google-mobile-ads@17.4.0`, gate UMP, revisão de privacidade quando aplicável, verificações de integridade SQLite e permissões reduzidas. Consulte [o relatório da Etapa 3](RELATORIO-ETAPA-3.md) para resultados, riscos e pendências da conta AdMob. É necessária nova Development Build; não foi iniciada. O restante deste documento mantém também registros das etapas anteriores, identificados abaixo.
 
 Retomada de 21/10/2026: busca local, organização por ordem original/pendentes/categorias e sugestões locais de produtos foram acrescentadas. A Development Build já foi instalada e testada no Android pelo usuário; os trechos sobre preparação da primeira build abaixo são o registro da etapa anterior. Consulte [o relatório da Etapa 2](RELATORIO-ETAPA-2.md) para o estado atual, verificações e roteiro de teste. Nenhuma build ou publicação foi feita nesta retomada.
 
@@ -6,14 +8,14 @@ Aplicativo Android de listas de compras, local e offline. Sem conta, servidor, d
 
 ## Executar para revisar
 
-Requisitos: Node.js 22.19+ e npm. O projeto usa Expo SDK 58; use uma versão do Expo Go para Android compatível com esse SDK.
+Requisitos: Node.js 22.19+ e npm. O projeto usa Expo SDK 58 e agora exige Development Build para o SDK nativo de anúncios.
 
 ```powershell
 npm.cmd ci
-npm.cmd start
+npm.cmd run start:dev
 ```
 
-No Android, abra o Expo Go e escaneie o QR exibido no terminal. Computador e celular devem estar na mesma rede. No PowerShell, o sufixo `.cmd` evita o bloqueio de execução de `npm.ps1`. Não é necessário liberar scripts globalmente.
+No Android, abra a nova Development Build e escaneie o QR exibido no terminal. Computador e celular devem estar na mesma rede. No PowerShell, o sufixo `.cmd` evita o bloqueio de execução de `npm.ps1`. Não é necessário liberar scripts globalmente. Não usar Expo Go para validar anúncios.
 
 Com Android SDK e emulador configurados:
 
@@ -106,9 +108,9 @@ Futuros preços, estabelecimentos, comprovantes e eventos financeiros poderão u
 
 ## Anúncios
 
-`AdBanner` é o ponto de integração reutilizável; nesta etapa retorna `null`, sem banner fictício ou espaço vazio. A configuração está desativada e não contém IDs. O slot existe apenas na tela inicial; o checklist não contém publicidade.
+`AdBanner` usa somente o banner adaptativo de teste Google na tela inicial, após UMP permitir solicitações e a inicialização do SDK concluir. Não aparece em formulários, menus, confirmações de exclusão ou checklist. Configuração central em `src/services/ads.ts`, desabilitada em produção, com gate preparado para futuro Premium. Falhas não impedem acesso às listas offline.
 
-Uma futura integração AdMob exigirá escolher um SDK nativo compatível, configurar o plugin e gerar uma development build; esse SDK não funciona no Expo Go padrão. Começar com IDs oficiais de teste, política de privacidade e consentimento aplicável, sem anúncios intersticiais. Nenhum SDK de anúncios foi instalado aqui.
+O plugin nativo foi configurado e exige nova Development Build, que só deve ser gerada após autorização. Mensagens de consentimento da conta AdMob, política de privacidade e validação no aparelho permanecem pendentes; os IDs de demonstração pertencem ao Google. Instruções completas no relatório da Etapa 3. Sem anúncios intersticiais ou obrigatórios.
 
 Referências oficiais: [criação de projeto Expo](https://docs.expo.dev/get-started/create-a-project/), [Expo Router](https://docs.expo.dev/versions/latest/sdk/router/), [Expo SQLite](https://docs.expo.dev/versions/latest/sdk/sqlite/).
 
@@ -122,7 +124,7 @@ npx.cmd expo install --check
 npx.cmd expo export --platform android
 ```
 
-Resultado da retomada: typecheck e lint aprovados, 5 testes aprovados, `expo-doctor` com 20/20 verificações aprovadas, `expo install --check` sem incompatibilidades e bundle Android exportado com sucesso. A exportação é apenas local, sem publicação.
+Resultado atual da Etapa 3: typecheck e lint aprovados, 16 testes aprovados, `expo-doctor` com 20/20 verificações aprovadas, `expo install --check` sem incompatibilidades e bundle Android exportado com sucesso. A exportação é apenas local, sem publicação. As análises históricas abaixo não substituem o relatório atual.
 
 Na análise inicial, o Git estava limpo e todas as funcionalidades básicas acima já estavam implementadas. Foram corrigidas a aceitação de notações não decimais na quantidade (como `0x10` e `1e3`) e a ordem da migração, que agora recusa bancos de versão superior antes de alterar configurações. Foram acrescentados testes de regressão e validação de categoria inválida. O `expo-doctor` identificou `expo-font` como dependência obrigatória ausente de `@expo/vector-icons`; o pacote compatível e seu plugin foram adicionados pelo instalador oficial do Expo.
 
@@ -132,7 +134,7 @@ Os testes verificam criação, renomeação, edição/remoção de produtos, mar
 
 Não há Android SDK/ADB ou aparelho conectado disponível neste ambiente. A exportação Android verifica bundling e resolução de módulos, mas não é uma compilação APK e não substitui a execução nativa. Teclado, navegação por toque, TalkBack, aparência em tamanhos diferentes, animações e persistência através de um encerramento real do processo Android precisam da revisão no dispositivo. Não há suporte web validado nesta etapa.
 
-O `npm audit` reportou 26 ocorrências na árvore transitiva (7 moderadas, 19 altas), principalmente propagadas por `braces`, `node-forge` e `uuid` na infraestrutura Expo/Metro/Xcode. `npm audit fix` sem `--force` não encontrou correção compatível; a sugestão automática força downgrade para Expo 44 e não foi aplicada. Reavaliar atualizações oficiais antes de distribuir o aplicativo. O UUID do aplicativo usa `expo-crypto`, não a versão transitiva de `uuid`.
+O `npm audit` atual reporta 20 alertas altos transitivos, propagados por `braces` e `node-forge` no tooling Expo/Metro. Correções compatíveis sem force removeram os três alertas moderados de xcode/uuid. A sugestão restante força downgrades incompatíveis e não foi aplicada. Detalhes e riscos no relatório da Etapa 3. O UUID do aplicativo usa `expo-crypto`.
 
 ## Roteiro para revisão Android
 
@@ -145,4 +147,4 @@ O `npm audit` reportou 26 ocorrências na árvore transitiva (7 moderadas, 19 al
 7. Fechar e reabrir o app; confirmar os dados. Em build instalada, repetir em modo avião.
 8. Conferir telas com fonte ampliada, TalkBack, movimento reduzido, teclado aberto e celulares pequenos/grandes.
 
-Próximo passo recomendado: revisão manual Android da Etapa 1 e ajustes resultantes, antes de autorizar qualquer nova funcionalidade.
+Próximo passo: aguardar autorização para gerar a nova Development Build e executar o roteiro físico da Etapa 3, preservando a instalação e os dados existentes.

@@ -21,6 +21,10 @@ export async function migrate(db: Database) {
   if ((version?.user_version ?? 0) > 1) throw new Error('Este banco foi atualizado por uma versão mais recente. Atualize o aplicativo.');
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   if (!version?.user_version) await db.withTransactionAsync(() => db.execAsync(schema));
+  const integrity = await db.getFirstAsync<{ quick_check: string }>('PRAGMA quick_check');
+  if (integrity?.quick_check !== 'ok') throw new Error('Não foi possível verificar a integridade das listas.');
+  const violation = await db.getFirstAsync('PRAGMA foreign_key_check');
+  if (violation) throw new Error('As listas precisam de uma revisão de integridade. Os dados não foram apagados.');
 }
 export function validName(value: string) {
   const name = value.trim();
