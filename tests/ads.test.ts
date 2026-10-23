@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { adsEnabled, createAdsController } from '../src/services/ads.ts';
-import type { AdsAdapter, AdsState, ConsentInfo } from '../src/services/ads.ts';
+import type { AdsAdapter, AdsFailurePhase, AdsState, ConsentInfo } from '../src/services/ads.ts';
 
 const approved: ConsentInfo = { canRequestAds: true, privacyOptionsRequirementStatus: 'REQUIRED' };
 test('switch, future premium, platform and production gate ads', () => {
@@ -61,4 +61,18 @@ test('initialization or privacy failure closes the banner gate', async () => {
   await controller.start(); assert.equal(state?.ready, false); assert.equal(state?.failed, true);
   failInit = false; await controller.start(); assert.equal(state?.ready, true);
   await controller.review(); assert.equal(state?.ready, false); assert.equal(state?.privacyRequired, true);
+});
+
+test('diagnostics distinguish consent, initialization and privacy failures without exposing SDK errors', async () => {
+  let phase: AdsFailurePhase = 'consent';
+  const reported: AdsFailurePhase[] = [];
+  const controller = createAdsController({
+    gatherConsent: async () => { if (phase === 'consent') throw Error('private payload'); return approved; },
+    initialize: async () => { if (phase === 'initialize') throw Error('private payload'); },
+    showPrivacyOptionsForm: async () => { throw Error('private payload'); },
+  }, () => {}, value => reported.push(value));
+  await controller.start();
+  phase = 'initialize'; await controller.start();
+  phase = 'privacy'; await controller.start(); await controller.review();
+  assert.deepEqual(reported, ['consent', 'initialize', 'privacy']);
 });

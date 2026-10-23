@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 import { adsConfig, adsEnabled, createAdsController, initialAdsState } from '../services/ads';
 import type { AdsState } from '../services/ads';
 
@@ -10,6 +11,7 @@ export function AdsProvider({ children, premium = false }: { children: React.Rea
   const [state, setState] = useState<AdsState>(initialAdsState);
   const [sdk, setSdk] = useState<AdsSDK>();
   const [controller, setController] = useState<ReturnType<typeof createAdsController>>();
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const enabled = adsEnabled(adsConfig.enabled, premium, __DEV__, Platform.OS);
   useEffect(() => {
     if (!enabled) return;
@@ -17,9 +19,10 @@ export function AdsProvider({ children, premium = false }: { children: React.Rea
     let current: ReturnType<typeof createAdsController> | undefined;
     async function load() {
       try {
-        // Lazy import keeps web and builds without the native module usable.
+        // Resolution happens during import, before UMP or SDK initialization.
         const native = await import('react-native-google-mobile-ads');
         if (!active) return;
+        if (__DEV__) console.info('[AdMob] sdk-import: success');
         setSdk(native);
         current = createAdsController({
           gatherConsent: () => native.AdsConsent.gatherConsent(),
@@ -28,14 +31,35 @@ export function AdsProvider({ children, premium = false }: { children: React.Rea
             await native.default().setRequestConfiguration({ maxAdContentRating: native.MaxAdContentRating.G });
             await native.default().initialize();
           },
-        }, next => { if (active) setState(next); });
+        }, next => { if (active) setState(next); }, phase => {
+          if (__DEV__ && active) console.warn(`[AdMob] ${phase}: failed`);
+        });
         setController(current);
         void current.start();
-      } catch { if (active) setState({ ...initialAdsState, failed: true }); }
+      } catch (error) {
+        if (!active) return;
+        setState({ ...initialAdsState, failed: true });
+        if (__DEV__) {
+          const missingNativeModule = error instanceof Error && /RNGoogleMobileAdsModule.*could not be found/.test(error.message);
+          // Fixed diagnostic fields only: no consent payloads, device IDs or list data.
+          console.warn('[AdMob] sdk-import: failed', {
+            reason: missingNativeModule ? 'native-module-unavailable' : 'sdk-import-failed',
+            executionEnvironment: Constants.executionEnvironment,
+            expoGoConfigPresent: Constants.expoGoConfig != null,
+          });
+        }
+      }
     }
     void load();
     return () => { current?.disable(); active = false; };
-  }, [enabled]);
-  return <Context.Provider value={{ ...state, ready: enabled && state.ready, sdk, retry: () => { void controller?.start(); }, review: () => { void controller?.review(); } }}>{children}</Context.Provider>;
+  }, [enabled, loadAttempt]);
+  return <Context.Provider value={{ ...state, ready: enabled && state.ready, sdk, retry: () => {
+    if (state.busy) return;
+    if (controller) void controller.start();
+    else {
+      setState({ ...initialAdsState, busy: true });
+      setLoadAttempt(attempt => attempt + 1);
+    }
+  }, review: () => { void controller?.review(); } }}>{children}</Context.Provider>;
 }
 export function useAds() { return useContext(Context); }

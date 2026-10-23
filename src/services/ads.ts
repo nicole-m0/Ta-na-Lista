@@ -16,8 +16,9 @@ export interface AdsAdapter {
 }
 export interface AdsState { ready: boolean; privacyRequired: boolean; busy: boolean; failed: boolean }
 export const initialAdsState: AdsState = { ready: false, privacyRequired: false, busy: false, failed: false };
+export type AdsFailurePhase = 'consent' | 'privacy' | 'initialize';
 
-export function createAdsController(adapter: AdsAdapter, changed: (state: AdsState) => void) {
+export function createAdsController(adapter: AdsAdapter, changed: (state: AdsState) => void, failed?: (phase: AdsFailurePhase) => void) {
   let state = initialAdsState;
   let pending: Promise<void> | undefined;
   let initialized = false;
@@ -27,16 +28,19 @@ export function createAdsController(adapter: AdsAdapter, changed: (state: AdsSta
     if (pending || !allowed) return pending ?? Promise.resolve();
     publish({ ...state, ready: false, busy: true, failed: false });
     pending = (async () => {
+      let phase: AdsFailurePhase = privacy ? 'privacy' : 'consent';
       try {
         const info = await (privacy ? adapter.showPrivacyOptionsForm() : adapter.gatherConsent());
         const privacyRequired = info.privacyOptionsRequirementStatus === 'REQUIRED';
         if (info.canRequestAds && allowed && !initialized) {
+          phase = 'initialize';
           await adapter.initialize(); initialized = true;
         }
         publish({ ready: allowed && info.canRequestAds && initialized, privacyRequired, busy: false, failed: false });
       } catch {
         // Fail closed, no cached consent or raw SDK identifiers in logs.
         publish({ ...state, ready: false, busy: false, failed: true });
+        failed?.(phase);
       }
     })().finally(() => { pending = undefined; });
     return pending;
