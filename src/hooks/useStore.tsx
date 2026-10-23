@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { openDatabaseAsync } from 'expo-sqlite';
 import { randomUUID } from 'expo-crypto';
 import { Repository, migrate } from '../db/repository';
+import { initializeDatabase } from '../db/initialize';
 import { Button, View, Text, ActivityIndicator } from 'react-native';
 import { colors } from '../theme';
 
@@ -14,9 +15,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     let active = true;
     async function init() {
       try {
-        const db = await openDatabaseAsync('ta-na-lista.db');
-        await migrate(db);
-        if (active) setRepository(new Repository(db, randomUUID));
+        await initializeDatabase(() => openDatabaseAsync('ta-na-lista.db', { useNewConnection: true }), migrate,
+          () => active, db => setRepository(new Repository(db, randomUUID)));
       } catch { if (active) setError('Não foi possível abrir suas listas. Seus dados não foram apagados.'); }
     }
     void init();

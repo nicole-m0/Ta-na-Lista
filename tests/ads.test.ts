@@ -4,6 +4,66 @@ import { adsEnabled, createAdsController } from '../src/services/ads.ts';
 import type { AdsAdapter, AdsFailurePhase, AdsState, ConsentInfo } from '../src/services/ads.ts';
 
 const approved: ConsentInfo = { canRequestAds: true, privacyOptionsRequirementStatus: 'REQUIRED' };
+test('repeated privacy review and retry share pending work and keep ads hidden until permission returns', async () => {
+  let state: AdsState | undefined; let resolve!: (info: ConsentInfo) => void;
+  let gathers = 0; let reviews = 0; let initializes = 0;
+  const controller = createAdsController({
+    gatherConsent: async () => { gathers++; return approved; },
+    showPrivacyOptionsForm: () => { reviews++; return new Promise(r => { resolve = r; }); },
+    initialize: async () => { initializes++; },
+  }, next => { state = next; });
+  await controller.start();
+  const first = controller.review(); const second = controller.review(); const retry = controller.start();
+  assert.equal(state?.ready, false); assert.equal(state?.busy, true); assert.equal(reviews, 1);
+  resolve({ ...approved, canRequestAds: false }); await Promise.all([first, second, retry]);
+  assert.equal(state?.ready, false); assert.equal(state?.busy, false);
+  assert.equal(gathers, 1); assert.equal(initializes, 1);
+  await controller.start(); assert.equal(state?.ready, true); assert.equal(initializes, 1);
+});
+
+test('disabling while SDK initializes never enables late ad requests', async () => {
+  let release!: () => void; let started!: () => void; let state: AdsState | undefined;
+  const initializing = new Promise<void>(resolve => { started = resolve; });
+  const controller = createAdsController({
+    gatherConsent: async () => approved, showPrivacyOptionsForm: async () => approved,
+    initialize: () => { started(); return new Promise<void>(resolve => { release = resolve; }); },
+  }, next => { state = next; });
+  const pending = controller.start(); await initializing; controller.disable(); release(); await pending;
+  await controller.start(); assert.equal(state?.ready, false); assert.equal(state?.busy, false);
+});
+
+test('synchronous SDK failure is contained and diagnostic receives only a fixed phase', async () => {
+  let state: AdsState | undefined; const phases: string[] = [];
+  const controller = createAdsController({
+    gatherConsent: () => { throw Error('private device payload'); },
+    showPrivacyOptionsForm: async () => approved, initialize: async () => assert.fail('no permission'),
+  }, next => { state = next; }, phase => phases.push(phase));
+  await controller.start(); await controller.start();
+  assert.equal(state?.ready, false); assert.equal(state?.busy, false);
+  assert.deepEqual(phases, ['consent', 'consent']);
+});
+test('required privacy review survives initialization failure and can revoke requests', async () => {
+  let state: AdsState | undefined; let reviews = 0;
+  const controller = createAdsController({
+    gatherConsent: async () => approved,
+    initialize: async () => { throw Error('initialize failed'); },
+    showPrivacyOptionsForm: async () => { reviews++; return { ...approved, canRequestAds: false }; },
+  }, next => { state = next; });
+  await controller.start();
+  assert.equal(state?.privacyRequired, true); assert.equal(state?.ready, false);
+  await controller.review(); assert.equal(reviews, 1); assert.equal(state?.ready, false);
+});
+
+test('malformed consent never initializes ads and valid NOT_REQUIRED uses SDK permission', async () => {
+  for (const info of [null, { canRequestAds: 'true', privacyOptionsRequirementStatus: 'REQUIRED' }, { canRequestAds: true, privacyOptionsRequirementStatus: 'invalid' }]) {
+    let state: AdsState | undefined;
+    const controller = createAdsController({ gatherConsent: async () => info as never, showPrivacyOptionsForm: async () => approved, initialize: async () => assert.fail('invalid permission') }, next => { state = next; });
+    await controller.start(); assert.equal(state?.ready, false); assert.equal(state?.failed, true);
+  }
+  let state: AdsState | undefined;
+  const controller = createAdsController({ gatherConsent: async () => ({ canRequestAds: true, privacyOptionsRequirementStatus: 'NOT_REQUIRED' }), showPrivacyOptionsForm: async () => approved, initialize: async () => {} }, next => { state = next; });
+  await controller.start(); assert.equal(state?.ready, true); assert.equal(state?.privacyRequired, false);
+});
 test('switch, future premium, platform and production gate ads', () => {
   assert.equal(adsEnabled(true, false, true, 'android'), true);
   for (const values of [[false, false, true, 'android'], [true, true, true, 'android'], [true, false, false, 'android'], [true, false, true, 'web'], [true, false, true, 'ios']] as const) {

@@ -31,7 +31,10 @@ export function createAdsController(adapter: AdsAdapter, changed: (state: AdsSta
       let phase: AdsFailurePhase = privacy ? 'privacy' : 'consent';
       try {
         const info = await (privacy ? adapter.showPrivacyOptionsForm() : adapter.gatherConsent());
+        if (!info || typeof info.canRequestAds !== 'boolean' || !['REQUIRED', 'NOT_REQUIRED', 'UNKNOWN'].includes(info.privacyOptionsRequirementStatus)) throw new Error('Invalid consent response');
         const privacyRequired = info.privacyOptionsRequirementStatus === 'REQUIRED';
+        // Keep the required review entry point even if SDK initialization fails.
+        publish({ ...state, privacyRequired });
         if (info.canRequestAds && allowed && !initialized) {
           phase = 'initialize';
           await adapter.initialize(); initialized = true;

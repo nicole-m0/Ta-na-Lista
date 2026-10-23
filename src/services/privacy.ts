@@ -1,0 +1,7 @@
+export const privacyInformation = [
+  ['Suas listas', 'Listas, produtos, quantidades e marcações ficam no armazenamento privado deste aplicativo no aparelho. O código do aplicativo não envia esse conteúdo a servidores nem o usa para direcionar anúncios. Não há conta ou sincronização.'],
+  ['Preservação dos dados', 'Excluir uma lista ou produto remove esses dados localmente. Não há lixeira ou recuperação pelo aplicativo. Desinstalar, limpar o armazenamento ou perder o aparelho pode causar perda das listas. O aplicativo não oferece backup próprio nem criptografia adicional do banco.'],
+  ['Publicidade de teste', 'Esta versão usa somente anúncios de teste do Google. Mesmo anúncios de teste fazem conexões externas. O SDK pode tratar IP, interações, diagnósticos e identificadores do dispositivo ou aplicativo. Anúncios não personalizados não significam ausência de coleta. O conteúdo das listas não é fornecido ao SDK pelo aplicativo.'],
+  ['Suas escolhas', 'O formulário oficial do Google é apresentado quando aplicável. A opção “Privacidade dos anúncios” aparece quando o SDK exige acesso à revisão das escolhas. Falhas de rede ou de consentimento mantêm os anúncios bloqueados e não impedem o uso local das listas.'],
+  ['Sobre estas informações', 'Estas informações técnicas ficam disponíveis offline. A política completa, com identificação do responsável e canal de direitos, ainda está em preparação antes da distribuição pública.'],
+] as const;

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { adsConfig, adsEnabled, createAdsController, initialAdsState } from '../services/ads';
@@ -10,10 +10,11 @@ const Context = createContext({ ...initialAdsState, sdk: undefined as AdsSDK | u
 export function AdsProvider({ children, premium = false }: { children: React.ReactNode; premium?: boolean }) {
   const [state, setState] = useState<AdsState>(initialAdsState);
   const [sdk, setSdk] = useState<AdsSDK>();
-  const [controller, setController] = useState<ReturnType<typeof createAdsController>>();
+  const controller = useRef<ReturnType<typeof createAdsController> | undefined>(undefined);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const enabled = adsEnabled(adsConfig.enabled, premium, __DEV__, Platform.OS);
   useEffect(() => {
+    controller.current = undefined;
     if (!enabled) return;
     let active = true;
     let current: ReturnType<typeof createAdsController> | undefined;
@@ -34,7 +35,7 @@ export function AdsProvider({ children, premium = false }: { children: React.Rea
         }, next => { if (active) setState(next); }, phase => {
           if (__DEV__ && active) console.warn(`[AdMob] ${phase}: failed`);
         });
-        setController(current);
+        controller.current = current;
         void current.start();
       } catch (error) {
         if (!active) return;
@@ -51,15 +52,15 @@ export function AdsProvider({ children, premium = false }: { children: React.Rea
       }
     }
     void load();
-    return () => { current?.disable(); active = false; };
+    return () => { active = false; current?.disable(); if (controller.current === current) controller.current = undefined; };
   }, [enabled, loadAttempt]);
   return <Context.Provider value={{ ...state, ready: enabled && state.ready, sdk, retry: () => {
     if (state.busy) return;
-    if (controller) void controller.start();
+    if (controller.current) void controller.current.start();
     else {
       setState({ ...initialAdsState, busy: true });
       setLoadAttempt(attempt => attempt + 1);
     }
-  }, review: () => { void controller?.review(); } }}>{children}</Context.Provider>;
+  }, review: () => { void controller.current?.review(); } }}>{children}</Context.Provider>;
 }
 export function useAds() { return useContext(Context); }

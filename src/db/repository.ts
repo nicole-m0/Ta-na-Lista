@@ -3,7 +3,7 @@ import type { Product, ProductInput, ShoppingList } from '../types/models.ts';
 
 export interface Database {
   execAsync(sql: string): Promise<void>;
-  runAsync(sql: string, ...params: (string | number | null)[]): Promise<unknown>;
+  runAsync(sql: string, ...params: (string | number | null)[]): Promise<{ changes: number | bigint }>;
   getFirstAsync<T>(sql: string, ...params: (string | number | null)[]): Promise<T | null>;
   getAllAsync<T>(sql: string, ...params: (string | number | null)[]): Promise<T[]>;
   withTransactionAsync(task: () => Promise<void>): Promise<void>;
@@ -27,20 +27,34 @@ export async function migrate(db: Database) {
   if (violation) throw new Error('As listas precisam de uma revisão de integridade. Os dados não foram apagados.');
 }
 export function validName(value: string) {
+  if (typeof value !== 'string') throw new Error('Informe um nome com 1 a 80 caracteres.');
   const name = value.trim();
-  if (!name || name.length > 80) throw new Error('Informe um nome com 1 a 80 caracteres.');
+  if (!name || name.length > 80 || /[\u0000-\u001f\u007f]/.test(name)) throw new Error('Informe um nome com 1 a 80 caracteres, sem caracteres de controle.');
   return name;
 }
 export function parseQuantity(value: string): number {
+  if (typeof value !== 'string' || value.length > 12) throw new Error('Informe uma quantidade decimal com até 12 caracteres.');
   const normalized = value.trim();
   if (!/^\d+(?:[.,]\d+)?$/.test(normalized)) throw new Error('Informe uma quantidade decimal, como 1 ou 1,5.');
-  return Number(normalized.replace(',', '.'));
+  const quantity = Number(normalized.replace(',', '.'));
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 99999) throw new Error('Use uma quantidade maior que zero e até 99.999.');
+  return quantity;
 }
 export function validateProduct(input: ProductInput): ProductInput {
+  if (!input || typeof input !== 'object') throw new Error('Informe os dados do produto.');
   const name = validName(input.name);
   if (!Number.isFinite(input.quantity) || input.quantity <= 0 || input.quantity > 99999) throw new Error('Use uma quantidade maior que zero e até 99.999.');
   if (!units.includes(input.unit) || (input.category !== null && !categories.includes(input.category))) throw new Error('Unidade ou categoria inválida.');
-  return { ...input, name };
+  return { name, quantity: input.quantity, unit: input.unit, category: input.category };
+}
+
+export function validId(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim() || value.length > 128 || /[\u0000-\u0020\u007f]/.test(value)) throw new Error('Identificador inválido.');
+  return value;
+}
+
+function requireChange(result: { changes: number | bigint }) {
+  if (Number(result.changes) !== 1) throw new Error('O registro não foi encontrado. Atualize a lista e tente novamente.');
 }
 
 export class Repository {
@@ -59,6 +73,7 @@ export class Repository {
     return this.db.getAllAsync<ShoppingList>(`SELECT l.*, COUNT(p.id) total, COALESCE(SUM(p.purchased),0) purchased FROM lists l LEFT JOIN products p ON p.listId=l.id GROUP BY l.id ORDER BY l.updatedAt DESC, l.id`);
   }
   async products(id: string) {
+    validId(id);
     await this.pending;
     return this.db.getAllAsync<Product>('SELECT * FROM products WHERE listId=? ORDER BY createdAt, rowid', id);
   }
@@ -81,11 +96,12 @@ export class Repository {
     });
   }
   rename(id: string, name: string) {
-    return this.write(() => this.db.runAsync('UPDATE lists SET name=?, updatedAt=? WHERE id=?', validName(name), new Date().toISOString(), id));
+    return this.write(async () => requireChange(await this.db.runAsync('UPDATE lists SET name=?, updatedAt=? WHERE id=?', validName(name), new Date().toISOString(), validId(id))));
   }
-  remove(id: string) { return this.write(() => this.db.runAsync('DELETE FROM lists WHERE id=?', id)); }
+  remove(id: string) { return this.write(async () => requireChange(await this.db.runAsync('DELETE FROM lists WHERE id=?', validId(id)))); }
   duplicate(id: string) {
     return this.write(async () => {
+      validId(id);
       const copyId = this.uuid(); const now = new Date().toISOString();
       await this.db.withTransactionAsync(async () => {
         const source = await this.db.getFirstAsync<ShoppingList>('SELECT * FROM lists WHERE id=?', id);
@@ -99,26 +115,30 @@ export class Repository {
   }
   saveProduct(listId: string, input: ProductInput, id?: string) {
     return this.write(async () => {
+      validId(listId);
+      if (id !== undefined) validId(id);
       const p = validateProduct(input); const now = new Date().toISOString();
       await this.db.withTransactionAsync(async () => {
-        if (id) await this.db.runAsync('UPDATE products SET name=?,quantity=?,unit=?,category=?,updatedAt=? WHERE id=? AND listId=?', p.name,p.quantity,p.unit,p.category,now,id,listId);
+        if (id !== undefined) requireChange(await this.db.runAsync('UPDATE products SET name=?,quantity=?,unit=?,category=?,updatedAt=? WHERE id=? AND listId=?', p.name,p.quantity,p.unit,p.category,now,id,listId));
         else await this.db.runAsync('INSERT INTO products VALUES (?,?,?,?,?,?,0,?,?)',this.uuid(),listId,p.name,p.quantity,p.unit,p.category,now,now);
         await this.touch(listId,now);
       });
     });
   }
   toggle(p: Product) { return this.write(async () => {
+    validId(p?.id); validId(p?.listId);
     const now = new Date().toISOString();
     await this.db.withTransactionAsync(async () => {
-      await this.db.runAsync('UPDATE products SET purchased=1-purchased,updatedAt=? WHERE id=? AND listId=?',now,p.id,p.listId);
+      requireChange(await this.db.runAsync('UPDATE products SET purchased=1-purchased,updatedAt=? WHERE id=? AND listId=?',now,p.id,p.listId));
       await this.touch(p.listId,now);
     });
   }); }
   removeProduct(p: Product) { return this.write(async () => {
+    validId(p?.id); validId(p?.listId);
     await this.db.withTransactionAsync(async () => {
-      await this.db.runAsync('DELETE FROM products WHERE id=? AND listId=?',p.id,p.listId);
+      requireChange(await this.db.runAsync('DELETE FROM products WHERE id=? AND listId=?',p.id,p.listId));
       await this.touch(p.listId,new Date().toISOString());
     });
   }); }
-  private touch(id: string, now: string) { return this.db.runAsync('UPDATE lists SET updatedAt=? WHERE id=?',now,id); }
+  private async touch(id: string, now: string) { requireChange(await this.db.runAsync('UPDATE lists SET updatedAt=? WHERE id=?',now,id)); }
 }

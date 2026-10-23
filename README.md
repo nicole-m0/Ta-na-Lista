@@ -1,4 +1,6 @@
-# Tá na Lista! · Etapa 3
+# Tá na Lista! · Etapa 4 — fase 1
+
+Atualização de 23/10/2026 — Etapa 4, fase 1: validação em runtime, detecção de operações sobre registros removidos, descarte de conexões SQLite não publicadas, proteção contra repetição de operações na Home e informações de privacidade disponíveis offline. Corrigida a preservação da opção UMP de revisão quando a inicialização de anúncios falha. Consulte [RELATORIO-ETAPA-4-FASE-1.md](RELATORIO-ETAPA-4-FASE-1.md) para resultados e pendências. A Development Build existente contém AdMob e já foi instalada com dados preservados; nenhuma nova build é necessária para estas mudanças JavaScript/TypeScript. As seções abaixo preservam registros históricos e suas instruções de build não são uma solicitação para executá-las.
 
 Estado atual: anúncios oficiais de teste com `react-native-google-mobile-ads@17.4.0`, gate UMP, revisão de privacidade quando aplicável, verificações de integridade SQLite e permissões reduzidas. Consulte [o relatório da Etapa 3](RELATORIO-ETAPA-3.md) para resultados, riscos e pendências da conta AdMob. A Development Build e11a08c0 já foi concluída e contém o módulo nativo AdMob; o Moto G84 foi atualizado via adb install -r para esse APK, com dados SQLite conferidos integralmente e banner de teste exibido. O erro RNGoogleMobileAdsModule foi resolvido. Consulte [o diagnóstico Android](DIAGNOSTICO-ADMOB.md) antes de gerar outra build. O restante deste documento mantém também registros das etapas anteriores, identificados abaixo.
 

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -9,6 +9,8 @@ import { ProductForm } from '../../components/ProductForm';
 import { ProductRow } from '../../components/ProductRow';
 import { visibleProducts, type ProductOrder } from '../../services/checklist';
 import { colors as c } from '../../theme';
+import { validId } from '../../db/repository';
+import { createOperationGate } from '../../services/operation';
 
 export default function Checklist() {
   const { id } = useLocalSearchParams<{ id: string }>(); const store = useStore();
@@ -16,17 +18,19 @@ export default function Checklist() {
   const [loading, setLoading] = useState(true); const [error, setError] = useState(''); const [form, setForm] = useState<{ product?: Product }>(); const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState(''); const [order, setOrder] = useState<ProductOrder>('original');
   const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const runOperation = useRef(createOperationGate()).current;
   const shown = visibleProducts(products, query, order);
   const refresh = useCallback(async () => {
-    try { const lists = await store.lists(); const found = lists.find(l => l.id === id); setList(found); setProducts(found ? await store.products(id) : []); setSuggestions(await store.frequentProducts()); setError(''); }
+    try { validId(id); const lists = await store.lists(); const found = lists.find(l => l.id === id); setList(found); setProducts(found ? await store.products(id) : []); setSuggestions(await store.frequentProducts()); setError(''); }
     catch { setError('Não foi possível carregar os produtos. Tente novamente.'); }
     finally { setLoading(false); }
   }, [id, store]);
   useFocusEffect(useCallback(() => { void refresh(); }, [refresh]));
   async function mutate(task: () => Promise<unknown>) {
-    if (busy) return;
-    setBusy(true);
-    try { await task(); await refresh(); } catch { Alert.alert('Não foi possível concluir', 'Tente novamente. A alteração não foi salva.'); } finally { setBusy(false); }
+    await runOperation(async () => {
+      setBusy(true);
+      try { await task(); await refresh(); } catch { Alert.alert('Não foi possível concluir', 'Tente novamente. A alteração não foi salva.'); } finally { setBusy(false); }
+    });
   }
   function options(p: Product) {
     Alert.alert(p.name, 'O que deseja fazer?', [{ text: 'Editar', onPress: () => setForm({ product: p }) }, { text: 'Excluir', style: 'destructive', onPress: () => Alert.alert('Excluir produto?', `Remover “${p.name}” desta lista?`, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Excluir', style: 'destructive', onPress: () => void mutate(() => store.removeProduct(p)) }]) }, { text: 'Cancelar', style: 'cancel' }]);

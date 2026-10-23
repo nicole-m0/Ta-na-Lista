@@ -5,8 +5,9 @@ import { randomUUID } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { Repository, migrate, parseQuantity, validateProduct } from '../src/db/repository.ts';
+import { Repository, migrate, parseQuantity, validateProduct, validName, validId } from '../src/db/repository.ts';
 import type { Database } from '../src/db/repository.ts';
+import { createOperationGate } from '../src/services/operation.ts';
 
 function adapter(raw: DatabaseSync): Database {
   return {
@@ -17,6 +18,137 @@ function adapter(raw: DatabaseSync): Database {
     async withTransactionAsync(task) { raw.exec('BEGIN'); try { await task(); raw.exec('COMMIT'); } catch (e) { raw.exec('ROLLBACK'); throw e; } },
   };
 }
+
+test('rapid gated submissions create one product and one toggle, then persist after reopening', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tanalista-repeat-')); const file = join(dir, 'repeat.db');
+  let raw = new DatabaseSync(file);
+  try {
+    let db = adapter(raw); await migrate(db); let repo = new Repository(db, randomUUID);
+    const id = await repo.create('Teste offline'); const run = createOperationGate();
+    const add = () => repo.saveProduct(id, { name: 'Leite', quantity: 1, unit: 'litro', category: null });
+    await Promise.all([run(add), run(add), run(add)]);
+    const products = await repo.products(id); assert.equal(products.length, 1);
+    const toggle = () => repo.toggle(products[0]!);
+    await Promise.all([run(toggle), run(toggle)]);
+    raw.close(); raw = new DatabaseSync(file); db = adapter(raw); await migrate(db); repo = new Repository(db, randomUUID);
+    assert.equal((await repo.products(id))[0]?.purchased, 1);
+    assert.equal((await repo.products(id)).length, 1);
+    assert.equal(raw.prepare('PRAGMA quick_check').get()?.quick_check, 'ok');
+  } finally { raw.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('malformed product writes and repeated deletion preserve all remaining rows and timestamps', async () => {
+  const raw = new DatabaseSync(':memory:');
+  try {
+    const db = adapter(raw); await migrate(db); const repo = new Repository(db, randomUUID);
+    const id = await repo.create('Preservada');
+    const input = { name: 'Arroz', quantity: 1, unit: 'kg', category: null } as const;
+    await repo.saveProduct(id, input); const product = (await repo.products(id))[0]!;
+    const snapshot = () => ({ lists: raw.prepare('SELECT * FROM lists').all(), products: raw.prepare('SELECT * FROM products').all() });
+    const before = snapshot();
+    for (const invalid of [null, [], { ...input, name: '\u0000' }, { ...input, quantity: '1' }, { ...input, category: undefined }, { ...input, quantity: NaN }]) await assert.rejects(repo.saveProduct(id, invalid as never));
+    for (const invalidId of ['', null, ['array'], 123]) await assert.rejects(repo.saveProduct(id, input, invalidId as never));
+    assert.deepEqual(snapshot(), before);
+    await repo.removeProduct(product); const after = snapshot();
+    await assert.rejects(repo.removeProduct(product)); await assert.rejects(repo.toggle(product));
+    assert.deepEqual(snapshot(), after);
+  } finally { raw.close(); }
+});
+
+test('integrity check failure refuses existing data without modifying its records or schema', async () => {
+  const raw = new DatabaseSync(':memory:');
+  try {
+    const db = adapter(raw); await migrate(db); const repo = new Repository(db, randomUUID);
+    await repo.create('Preservada'); const before = raw.prepare('SELECT * FROM lists').all();
+    const first = db.getFirstAsync;
+    db.getFirstAsync = async <T>(sql: string, ...params: (string | number | null)[]) => sql === 'PRAGMA quick_check' ? { quick_check: 'simulated corruption' } as T : first<T>(sql, ...params);
+    await assert.rejects(migrate(db), /integridade/);
+    assert.deepEqual(raw.prepare('SELECT * FROM lists').all(), before);
+    assert.equal(raw.prepare('PRAGMA user_version').get()?.user_version, 1);
+  } finally { raw.close(); }
+});
+
+test('runtime validation rejects malformed input without writing and preserves literal names', async () => {
+  const raw = new DatabaseSync(':memory:');
+  try {
+    await migrate(adapter(raw)); const repo = new Repository(adapter(raw), randomUUID);
+    for (const value of [null, undefined, 123, {}, 'x'.repeat(81), 'Arroz\u0000oculto', 'A\nB']) {
+      assert.throws(() => validName(value as never));
+      await assert.rejects(repo.create(value as never));
+    }
+    for (const value of [null, [], '', ' ', 'a b', 'x'.repeat(129)]) assert.throws(() => validId(value));
+    for (const value of [null, 1, '0', '100000', '9'.repeat(500)]) assert.throws(() => parseQuantity(value as never));
+    for (const value of [null, {}, { name: 'Arroz', quantity: '1', unit: 'kg', category: null }]) assert.throws(() => validateProduct(value as never));
+    assert.deepEqual(await repo.lists(), []);
+    const name = "Feira ' ; DROP TABLE lists; --";
+    await repo.create(name); assert.equal((await repo.lists())[0]?.name, name);
+  } finally { raw.close(); }
+});
+
+test('stale or foreign product operations fail without touching any existing row', async () => {
+  const raw = new DatabaseSync(':memory:');
+  try {
+    const db = adapter(raw); await migrate(db); const repo = new Repository(db, randomUUID);
+    const id = await repo.create('Original'); const other = await repo.create('Outra');
+    const input = { name: 'Leite', quantity: 1, unit: 'litro', category: null } as const;
+    await repo.saveProduct(id, input); const product = (await repo.products(id))[0]!;
+    const snapshot = () => ({ lists: raw.prepare('SELECT * FROM lists ORDER BY id').all(), products: raw.prepare('SELECT * FROM products ORDER BY id').all() });
+    const before = snapshot();
+    await assert.rejects(repo.rename('missing', 'Não existe'));
+    await assert.rejects(repo.remove('missing'));
+    await assert.rejects(repo.saveProduct(id, input, 'missing'));
+    await assert.rejects(repo.saveProduct(other, input, product.id));
+    await assert.rejects(repo.saveProduct('missing', input));
+    await assert.rejects(repo.toggle({ ...product, listId: other }));
+    await assert.rejects(repo.removeProduct({ ...product, id: 'missing' }));
+    await assert.rejects(repo.products(['route-array'] as never));
+    assert.deepEqual(snapshot(), before);
+    await repo.rename(id, 'Ainda funciona'); assert.equal((await repo.lists()).find(l => l.id === id)?.name, 'Ainda funciona');
+  } finally { raw.close(); }
+});
+
+test('consistent SQLite copy includes WAL transactions and can be reopened independently', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'tanalista-backup-'));
+  const raw = new DatabaseSync(join(dir, 'source.db'));
+  let copy: DatabaseSync | undefined;
+  try {
+    const db = adapter(raw); await migrate(db); raw.exec('PRAGMA wal_autocheckpoint=0');
+    const repo = new Repository(db, randomUUID); const id = await repo.create('Teste de cópia');
+    await repo.saveProduct(id, { name: 'Arroz', quantity: 1.5, unit: 'kg', category: null });
+    await repo.toggle((await repo.products(id))[0]!);
+    const before = { lists: raw.prepare('SELECT * FROM lists').all(), products: raw.prepare('SELECT * FROM products').all() };
+    const file = join(dir, 'consistent.db');
+    // VACUUM INTO creates a new consistent SQLite snapshot, including committed WAL.
+    raw.prepare('VACUUM INTO ?').run(file);
+    copy = new DatabaseSync(file); await migrate(adapter(copy));
+    assert.deepEqual(copy.prepare('SELECT * FROM lists').all(), before.lists);
+    assert.deepEqual(copy.prepare('SELECT * FROM products').all(), before.products);
+    assert.equal(copy.prepare('PRAGMA quick_check').get()?.quick_check, 'ok');
+    assert.deepEqual(copy.prepare('PRAGMA foreign_key_check').all(), []);
+    assert.equal(copy.prepare('PRAGMA user_version').get()?.user_version, 1);
+    assert.deepEqual(raw.prepare('SELECT * FROM products').all(), before.products);
+  } finally { copy?.close(); raw.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('failure updating parent timestamp rolls back product mutation and queue recovers', async () => {
+  const raw = new DatabaseSync(':memory:');
+  try {
+    const db = adapter(raw); await migrate(db); const repo = new Repository(db, randomUUID);
+    const id = await repo.create('Original');
+    await repo.saveProduct(id, { name: 'Arroz', quantity: 1, unit: 'kg', category: null });
+    const product = (await repo.products(id))[0]!;
+    const before = raw.prepare('SELECT * FROM products').all();
+    const run = db.runAsync;
+    db.runAsync = async (sql, ...params) => {
+      if (sql.startsWith('UPDATE lists SET updatedAt')) throw Error('disk write failure');
+      return run(sql, ...params);
+    };
+    await assert.rejects(repo.toggle(product));
+    assert.deepEqual(raw.prepare('SELECT * FROM products').all(), before);
+    db.runAsync = run;
+    await repo.toggle(product); assert.equal((await repo.products(id))[0]?.purchased, 1);
+  } finally { raw.close(); }
+});
 test('CRUD, checklist, duplication, cascade, migrations and persistence after reopening', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'tanalista-')); const file = join(dir, 'test.db');
   let raw = new DatabaseSync(file);
