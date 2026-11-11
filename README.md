@@ -1,4 +1,8 @@
-# Tá na Lista! · Etapa 4 — fase 1
+# Tá na Lista! · Etapa 4 — fases 1 e 2
+
+Atualização de 11/11/2026 — validação Android da Etapa 4 concluída e aprovada no Moto G84 5G, usando a Development Build `e11a08c0` já instalada e o Metro desta raiz, sem nova build. Os 12 passos do roteiro passaram: código das fases 1 e 2 carregado, CRUD em lista sintética, validações, checklist, busca, ordenação, reabertura, uso sem internet, banner de teste somente na Home e comparação final com o baseline. As linhas da lista antiga e de seus produtos permaneceram idênticas; o banco manteve `user_version = 1`, integridade válida e nenhuma violação de chave estrangeira. Foram registradas duas observações menores (rótulo de acessibilidade com `1.5` e o texto "1 pendentes"), ainda não corrigidas. Consentimento UMP por região continua pendente por limitação do App ID de demonstração. Detalhes em [RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md](RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md).
+
+Atualização de 23/10/2026 — Etapa 4, fase 2: investigação dos alertas de dependências (5 altos, causa `node-forge`, sem correção compatível publicada identificada; nenhuma dependência alterada), trava síncrona contra repetição também nos formulários e no checklist, separação entre erro de validação e erro de gravação no formulário de lista e padrões de `.gitignore` para bancos locais, APK/AAB e chaves de assinatura. Consulte [RELATORIO-ETAPA-4-FASE-2.md](RELATORIO-ETAPA-4-FASE-2.md).
 
 Atualização de 23/10/2026 — Etapa 4, fase 1: validação em runtime, detecção de operações sobre registros removidos, descarte de conexões SQLite não publicadas, proteção contra repetição de operações na Home e informações de privacidade disponíveis offline. Corrigida a preservação da opção UMP de revisão quando a inicialização de anúncios falha. Consulte [RELATORIO-ETAPA-4-FASE-1.md](RELATORIO-ETAPA-4-FASE-1.md) para resultados e pendências. A Development Build existente contém AdMob e já foi instalada com dados preservados; nenhuma nova build é necessária para estas mudanças JavaScript/TypeScript. As seções abaixo preservam registros históricos e suas instruções de build não são uma solicitação para executá-las.
 
@@ -17,7 +21,7 @@ npm.cmd ci
 npm.cmd run start:dev
 ```
 
-No Android, abra a nova Development Build e escaneie o QR exibido no terminal. Computador e celular devem estar na mesma rede. No PowerShell, o sufixo `.cmd` evita o bloqueio de execução de `npm.ps1`. Não é necessário liberar scripts globalmente. Não usar Expo Go para validar anúncios.
+No Android, abra a Development Build instalada (`e11a08c0`) e escaneie o QR exibido no terminal. Computador e celular devem estar na mesma rede. Alternativa por cabo, usada na validação de 11/11/2026: com depuração USB autorizada, executar `adb reverse tcp:8081 tcp:8081` e abrir `exp+ta-na-lista://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081` no aparelho; o ADB está em `.expo/android-tools/platform-tools/`. No PowerShell, o sufixo `.cmd` evita o bloqueio de execução de `npm.ps1`. Não é necessário liberar scripts globalmente. Não usar Expo Go para validar anúncios.
 
 Com Android SDK e emulador configurados:
 
@@ -28,6 +32,8 @@ npm.cmd run android
 O acesso à rede serve ao carregamento do ambiente de desenvolvimento. Listas e produtos usam SQLite no dispositivo e não fazem solicitações de rede. Para validar inicialização totalmente offline, use uma build Android local de desenvolvimento/release instalada; o Expo Go depende do Metro para recarregar o código durante desenvolvimento. A distribuição nativa não foi gerada nesta etapa.
 
 ## Development Build no Android
+
+**Estado atual:** a Development Build EAS `e11a08c0` (perfil `development`, APK) já existe e está instalada no Moto G84 desde 23/10/2026. A APK não embute o JavaScript: o código é carregado do Metro, por isso as fases 1 e 2 da Etapa 4, só JavaScript/TypeScript, não exigiram nova build. Nova build só é necessária se houver alteração de dependência ou configuração nativa, e somente após autorização. O texto abaixo é o registro histórico da preparação da primeira build (20/10/2026); seus comandos não são uma solicitação para executá-los.
 
 O projeto inclui `expo-dev-client` compatível com SDK 58 e um perfil `development` em `eas.json`, com distribuição interna e saída APK. O identificador Android continua `com.tanalista.app`; nenhuma funcionalidade ou esquema SQLite foi alterado.
 
@@ -76,10 +82,15 @@ Referências: [Development Builds](https://docs.expo.dev/develop/development-bui
 ```text
 src/
   app/                 Expo Router: inicial, layout e list/[id]
-  components/          Formulários, cards, botões, progresso e slot de anúncio
-  db/repository.ts     Migração e operações SQLite, independentes da interface
+  components/          Formulários, cards, botões, progresso, banner, opções de privacidade dos anúncios e privacidade local
+  db/repository.ts     Migração, validações e operações SQLite, independentes da interface
+  db/initialize.ts     Abertura do banco com descarte de conexões não publicadas
   hooks/useStore.tsx   Inicialização e injeção do repositório
-  services/ads.ts      Configuração isolada de anúncios, desativada
+  hooks/useAds.tsx     Carregamento do SDK, gate UMP e estado dos anúncios
+  services/ads.ts      Configuração isolada de anúncios de teste e controlador de consentimento (somente desenvolvimento Android)
+  services/checklist.ts  Busca e ordenação do checklist
+  services/operation.ts  Trava síncrona contra operações repetidas
+  services/privacy.ts  Texto local de privacidade
   theme/               Cores
   types/               Modelos, unidades e categorias
 assets/                Ícones PNG e fonte SVG
@@ -112,7 +123,7 @@ Futuros preços, estabelecimentos, comprovantes e eventos financeiros poderão u
 
 `AdBanner` usa somente o banner adaptativo de teste Google na tela inicial, após UMP permitir solicitações e a inicialização do SDK concluir. Não aparece em formulários, menus, confirmações de exclusão ou checklist. Configuração central em `src/services/ads.ts`, desabilitada em produção, com gate preparado para futuro Premium. Falhas não impedem acesso às listas offline.
 
-O plugin nativo foi configurado e exige nova Development Build, que só deve ser gerada após autorização. Mensagens de consentimento da conta AdMob, política de privacidade e validação no aparelho permanecem pendentes; os IDs de demonstração pertencem ao Google. Instruções completas no relatório da Etapa 3. Sem anúncios intersticiais ou obrigatórios.
+O plugin nativo está incluído na Development Build `e11a08c0` instalada. Na validação de 11/11/2026 o banner de teste apareceu somente na Home, ficou bloqueado sem internet e voltou após nova verificação com a rede restaurada. Mensagens de consentimento da conta AdMob, testes UMP por região (aceitar, recusar, revisar) e política de privacidade completa permanecem pendentes; os IDs de demonstração pertencem ao Google. Instruções completas no relatório da Etapa 3. Sem anúncios intersticiais ou obrigatórios.
 
 Referências oficiais: [criação de projeto Expo](https://docs.expo.dev/get-started/create-a-project/), [Expo Router](https://docs.expo.dev/versions/latest/sdk/router/), [Expo SQLite](https://docs.expo.dev/versions/latest/sdk/sqlite/).
 
@@ -126,7 +137,9 @@ npx.cmd expo install --check
 npx.cmd expo export --platform android
 ```
 
-Resultado atual da Etapa 3: typecheck e lint aprovados, 16 testes aprovados, `expo-doctor` com 20/20 verificações aprovadas, `expo install --check` sem incompatibilidades e bundle Android exportado com sucesso. A exportação é apenas local, sem publicação. As análises históricas abaixo não substituem o relatório atual.
+Resultado atual (11/11/2026): typecheck e lint aprovados, 33/33 testes aprovados. Expo Doctor, `expo install --check` e export do bundle não foram repetidos nesta data; o último `expo install --check` (fase 2, 23/10/2026) não encontrou incompatibilidades.
+
+Resultado histórico da Etapa 3: typecheck e lint aprovados, 16 testes aprovados, `expo-doctor` com 20/20 verificações aprovadas, `expo install --check` sem incompatibilidades e bundle Android exportado com sucesso. A exportação é apenas local, sem publicação. As análises históricas abaixo não substituem o relatório atual.
 
 Na análise inicial, o Git estava limpo e todas as funcionalidades básicas acima já estavam implementadas. Foram corrigidas a aceitação de notações não decimais na quantidade (como `0x10` e `1e3`) e a ordem da migração, que agora recusa bancos de versão superior antes de alterar configurações. Foram acrescentados testes de regressão e validação de categoria inválida. O `expo-doctor` identificou `expo-font` como dependência obrigatória ausente de `@expo/vector-icons`; o pacote compatível e seu plugin foram adicionados pelo instalador oficial do Expo.
 
@@ -134,11 +147,15 @@ Os testes verificam criação, renomeação, edição/remoção de produtos, mar
 
 ### Limites da validação
 
-Não há Android SDK/ADB ou aparelho conectado disponível neste ambiente. A exportação Android verifica bundling e resolução de módulos, mas não é uma compilação APK e não substitui a execução nativa. Teclado, navegação por toque, TalkBack, aparência em tamanhos diferentes, animações e persistência através de um encerramento real do processo Android precisam da revisão no dispositivo. Não há suporte web validado nesta etapa.
+Situação em 11/11/2026: a execução nativa no Moto G84 5G, incluindo persistência após encerramento real do processo e uso sem internet, foi validada conforme [o relatório de validação Android](RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md). Continuam sem revisão no dispositivo: TalkBack, fonte ampliada, aparência em tamanhos diferentes, navegação por gestos/três botões e as operações de renomear, duplicar e excluir lista. Não há suporte web validado.
 
-O `npm audit` atual reporta 20 alertas altos transitivos, propagados por `braces` e `node-forge` no tooling Expo/Metro. Correções compatíveis sem force removeram os três alertas moderados de xcode/uuid. A sugestão restante força downgrades incompatíveis e não foi aplicada. Detalhes e riscos no relatório da Etapa 3. O UUID do aplicativo usa `expo-crypto`.
+Registro histórico (Etapa 3): na época não havia Android SDK/ADB ou aparelho conectado. A exportação Android verifica bundling e resolução de módulos, mas não é uma compilação APK e não substitui a execução nativa.
+
+O `npm audit` mais recente (fase 2 da Etapa 4, 23/10/2026) reporta 5 alertas altos, 0 moderados e 0 críticos, com causa em `node-forge@1.4.0` no tooling Expo e entradas propagadas; não havia correção publicada compatível. A auditoria não foi repetida desde então. Os 20 alertas citados na Etapa 3 são históricos. Detalhes em [RELATORIO-ETAPA-4-FASE-2.md](RELATORIO-ETAPA-4-FASE-2.md). O UUID do aplicativo usa `expo-crypto`.
 
 ## Roteiro para revisão Android
+
+Roteiro geral de revisão manual. A validação de 11/11/2026 seguiu o roteiro de 12 passos do relatório de validação Android, que cobre os itens 2, 3, 4, a exclusão de produto do item 6 e o item 7. Ainda não foram executados no aparelho: renomear lista (item 1), duplicar lista (item 5), excluir lista (item 6) e o item 8.
 
 1. Abrir o app vazio, criar duas listas, renomear uma e voltar da checklist.
 2. Adicionar produtos com vírgula decimal, unidades e categorias; usar “Adicionar e continuar”.
@@ -149,4 +166,4 @@ O `npm audit` atual reporta 20 alertas altos transitivos, propagados por `braces
 7. Fechar e reabrir o app; confirmar os dados. Em build instalada, repetir em modo avião.
 8. Conferir telas com fonte ampliada, TalkBack, movimento reduzido, teclado aberto e celulares pequenos/grandes.
 
-Próximo passo: aguardar autorização para gerar a nova Development Build e executar o roteiro físico da Etapa 3, preservando a instalação e os dados existentes.
+Próximo passo: aguardar autorização para o que vier após a validação da Etapa 4. Não é necessária nova Development Build para mudanças somente em JavaScript/TypeScript. Pendências registradas: as duas observações de texto/acessibilidade, os itens do roteiro ainda não executados no aparelho e o consentimento UMP por região, que depende de configuração da conta AdMob.

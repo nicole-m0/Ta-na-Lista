@@ -1,6 +1,88 @@
 # Tá na Lista! — Validação Android da Etapa 4
 
-Data de preparação: 23/10/2026. **Status: em andamento. O usuário confirmou cabo conectado e depuração ativada; as consultas ADB da retomada ainda não reconhecem o aparelho. Nenhum teste físico desta rodada está aprovado.**
+Preparação: 23/10/2026. Execução: 11/11/2026. **Status: concluída e aprovada no escopo das Fases 1 e 2 da Etapa 4.** Os 12 passos do roteiro foram executados no Moto G84 5G (Android 15) com a Development Build `e11a08c0` já instalada, sem nova build, sem reinstalação e sem alteração de código, schema ou dependências. As linhas da lista antiga e de seus 7 produtos permaneceram idênticas ao baseline. Pendências que dependem de configuração externa ou de ensaios não incluídos no roteiro estão listadas ao final da seção de 11/11.
+
+## Execução de 11/11/2026
+
+### Conexão do aparelho
+
+- Três consultas `adb devices -l` retornaram lista vazia. Consulta somente de leitura com `Get-PnpDevice` mostrou o aparelho presente como `moto g84 5G`, classe WPD (transferência de arquivos), status OK, `VID_22B8&PID_2E82`, sem interface ADB e sem dispositivo com erro. O Windows também registrava uma conexão anterior `PID_2E81`, compatível com o modo com ADB usado em 23/10. Nenhum driver foi instalado nem configuração alterada.
+- Após o usuário reativar a Depuração USB, o aparelho passou a `device` (`model:moto_g84_5G`). O serial não é registrado neste relatório.
+
+### Resultados por passo
+
+| Ordem | Ensaio/ação | Resultado | Situação |
+| --- | --- | --- | --- |
+| 1 | Consultar ADB | Aparelho em estado `device`, modelo moto_g84_5G | Aprovado |
+| 2 | Pacote instalado e origem do binário | `com.tanalista.app` 1.0.0, versionCode 1; primeira instalação 20/10/2026 16:05:33; última atualização 23/10/2026 15:07:25 (sem mudança desde então). `base.apk` copiado para arquivo novo: 280.916.302 bytes, SHA-256 `d121df35ca3999fb7b7a5440e6d6725d5297d845ea9d1bf07a6ddc855f521a89`, idêntico ao artefato EAS `e11a08c0` | Aprovado |
+| 3 | Conectar a build existente ao Metro | Metro desta raiz com `npm.cmd run start:dev -- --lan` (`EXPO_OFFLINE=1`, telemetria desativada); `adb reverse tcp:8081 tcp:8081`; deep link `exp+ta-na-lista://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081` resolvido para `com.tanalista.app/.MainActivity` (não Expo Go). Início frio, bundle Android com 1352 módulos, JS iniciado às 14:53:02 | Aprovado |
+| 4 | Baseline de preservação | Antes de abrir o app com o código novo, com o processo parado: cópia via `run-as`/`tar` de banco, WAL e SHM para pasta nova; análise somente na cópia local. `quick_check` e `integrity_check` ok, 0 violações de chave estrangeira, `user_version = 1`, WAL. 1 lista, 7 produtos (7 comprados). Hashes iguais ao snapshot de 23/10. Arquivos do aparelho com tamanhos e datas inalterados após a cópia | Aprovado |
+| 5 | Home e privacidade local | Botão **Privacidade e dados locais** presente na Home, o que confirma a execução do código das Fases 1 e 2. Modal com as cinco seções; banner ausente enquanto o modal está aberto e de volta após fechá-lo | Aprovado |
+| 6 | Lista isolada de validação | Nome vazio rejeitado com mensagem de validação, sem gravação. Criada uma única lista `VALIDACAO ETAPA 4 - 2026-11-11` (contagem passou de 1 para 2 listas) | Aprovado |
+| 7 | Produtos sintéticos | Quantidade `0` rejeitada ("Use uma quantidade maior que zero e até 99.999."); `1e3` rejeitada ("Informe uma quantidade decimal, como 1 ou 1,5."); formulário preservado e nada gravado. `1,5` kg/Mercearia aceito via **Adicionar e continuar**, com nome limpo e unidade/categoria preservadas. Edição de quantidade (2 → 3 litro). Exclusão de produto descartável: cancelar manteve o item; confirmar removeu | Aprovado |
+| 8 | Checklist | Marcar/desmarcar com progresso atualizado (1 de 2 → 0 de 2 → 1 de 2). Ordenações **Pendentes primeiro**, **Categorias** (cabeçalhos Laticínios e Mercearia na ordem definida) e **Ordem original** corretas. Busca `TESTE B` encontrou 1 de 2, sem diferença de maiúsculas; `xyz` exibiu "Nenhum produto encontrado"; limpar busca restaurou a lista | Aprovado |
+| 9 | Encerrar e reabrir | `am force-stop` seguido de início frio: listas, quantidades, unidades, categorias e marcações persistidas; lista antiga com 7 de 7 | Aprovado |
+| 10 | Operar sem internet | Modo avião confirmado (`airplane_mode_on=1`, sem rede ativa, ping externo inalcançável); ADB e Metro mantidos pelo USB. Início frio: listas carregadas; marcar/desmarcar gravados; privacidade local aberta; anúncios bloqueados com "Anúncios indisponíveis. Suas listas continuam funcionando offline."; **Verificar anúncios novamente** falhou novamente de modo fechado, sem travar | Aprovado |
+| 11 | Anúncio e UMP | Banner adaptativo marcado **Anúncio de teste** somente na Home. Nenhuma view de anúncio nos 45 dumps de checklist, formulários, diálogos e modal. Com a rede restaurada, **Verificar anúncios novamente** recuperou o banner sem reiniciar o app. Nenhum anúncio foi tocado | Aprovado no escopo testável |
+| 12 | Comparação final | Ver tabela abaixo | Aprovado |
+
+O ensaio de toque repetido foi feito em **Adicionar e continuar**: dois toques sequenciais rápidos geraram um único produto. O segundo toque, que após o salvamento cairia sobre **Adicionar produto** com o nome já limpo, não produziu erro de validação nem duplicação; foi descartado durante a operação. Dois toques injetados exatamente simultâneos pelo ADB se anulam no Android e não servem como ensaio; essa tentativa não gerou envio.
+
+### Comparação final com o baseline de 11/11
+
+Cópia final feita com o app parado, em pasta nova, comparada com uma cópia de leitura do baseline.
+
+| Item | Baseline | Final |
+| --- | --- | --- |
+| `quick_check` / `integrity_check` | ok / ok | ok / ok |
+| Violações de chave estrangeira | 0 | 0 |
+| `user_version` | 1 | 1 |
+| SHA-256 do schema (`sqlite_master`) | `a42df5f29d4d08c04c621b0430a78718aed5b575010120a53c0ba37395c32c06` | idêntico |
+| Linhas da lista antiga | `87c0ca7aed89967b1e0b3fbbad3bb8e86138364bd49358ce6d3ed0765b6da333` | idêntico |
+| Linhas dos 7 produtos antigos | `ce6c00a6854599047f304664f735b21c1551c9d8dc4b883332988fa83e2d2847` | idêntico |
+| Totais | 1 lista, 7 produtos | 2 listas, 9 produtos |
+
+Nenhuma linha antiga foi alterada, removida ou recebeu produto novo. As únicas linhas novas são a lista sintética e seus dois produtos: `Produto teste A` (1,5 kg, Mercearia, desmarcado) e `Produto teste B` (3 litro, Laticínios, marcado). Os hashes usam o mesmo método do snapshot de 23/10 (todas as colunas, ordenadas por ID), sem expor nomes pessoais.
+
+### Logs e avisos
+
+- Nas consultas de logcat do processo não houve `FATAL EXCEPTION`, erro `AndroidRuntime` nem `RNGoogleMobileAdsModule ... could not be found`. Com rede: `[AdMob] sdk-import: success`. Sem rede: `[AdMob] consent: failed`, comportamento esperado do gate fechado.
+- Metro emitiu os avisos conhecidos de ausência de `iosAppId` e "Unable to resolve manifest assets"; ícones e fontes foram exibidos normalmente na tela.
+- Na abertura inicial a tela do aparelho estava apagada e bloqueada; o usuário desbloqueou antes da primeira captura.
+
+### Observações encontradas (sem impacto nos dados; não corrigidas)
+
+1. **Acessibilidade:** o rótulo de acessibilidade do produto anuncia a quantidade com ponto (por exemplo `Produto teste A, 1.5 kg`), enquanto a tela exibe `1,5 kg`. Origem: `accessibilityLabel` em `src/components/ProductRow.tsx`, que usa o número sem formatação pt-BR.
+2. **Texto:** o checklist exibe "1 pendentes" quando há um único item pendente. Origem: `src/app/list/[id].tsx`.
+
+### Configuração nativa observada
+
+`dumpsys package` da instalação atual registra `flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ]`, sem `ALLOW_BACKUP`, coerente com `allowBackup: false`. A flag `ALLOW_BACKUP` registrada em 23/10 pertencia à instalação anterior. Permissões efetivas (incluindo AD_ID), componentes exportados e regras de transferência entre aparelhos não foram inspecionados nesta rodada.
+
+### Pendências após a validação
+
+1. **UMP por região:** apresentação do formulário, aceitar, recusar, revisar e alterar escolhas continuam pendentes. O App ID de demonstração pertence ao Google e não valida as mensagens da conta da desenvolvedora. O botão **Privacidade dos anúncios** não apareceu nesta sessão, o que indica que o SDK não exigiu revisão; isso não equivale a aceite nem a validação regional.
+2. **Fora do roteiro de 12 passos:** renomear, duplicar e excluir lista; TalkBack; fonte ampliada; telas de outros tamanhos; navegação por gestos e três botões. Não foram executados nesta rodada.
+3. **Manifest efetivo:** AD_ID, permissões e componentes exportados ainda não inspecionados no binário instalado.
+4. As duas observações acima aguardam autorização para correção.
+5. Os alertas de tooling (`node-forge`) registrados na fase 2 não foram reavaliados nesta rodada.
+
+### Verificações automatizadas
+
+Antes da validação, em 11/11/2026: `npm.cmd run typecheck` e `npm.cmd run lint` aprovados; `npm.cmd test` com 33/33 aprovados. O código não foi alterado desde então.
+
+### Preservação e estado final
+
+- Nenhum APK gerado ou instalado, nenhuma build, nenhuma escrita direta no banco, nenhum script de restauração executado, nenhuma alteração de schema, migração ou dependência.
+- A lista sintética permanece no aparelho; nenhum registro de teste foi removido.
+- Ao final: app encerrado, Metro encerrado, `adb reverse` removido e modo avião desativado pelo usuário.
+- Evidências locais, ignoradas pelo Git e com dados pessoais (não compartilhar): `.expo/installed-2026-11-11.apk`, `.expo/sqlite-baseline-2026-11-11/`, `.expo/validation-2026-11-11/` (capturas, dumps de interface e horários) e `.expo/sqlite-final-2026-11-11/` (cópia final e `comparison.json`). Os backups históricos de `.expo/` não foram sobrescritos.
+
+---
+
+## Registro histórico da preparação (23/10/2026)
+
+As seções abaixo preservam o registro de 23/10, quando o aparelho não foi reconhecido pelo ADB. A coluna "Situação" do roteiro reflete aquela data; os resultados estão na seção de 11/11 acima.
 
 ## Preparação e evidências atuais
 
