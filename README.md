@@ -1,6 +1,6 @@
 # Tá na Lista! · Etapa 4 — fases 1 e 2
 
-Atualização de 11/11/2026 — validação Android da Etapa 4 concluída e aprovada no Moto G84 5G, usando a Development Build `e11a08c0` já instalada e o Metro desta raiz, sem nova build. Os 12 passos do roteiro passaram: código das fases 1 e 2 carregado, CRUD em lista sintética, validações, checklist, busca, ordenação, reabertura, uso sem internet, banner de teste somente na Home e comparação final com o baseline. As linhas da lista antiga e de seus produtos permaneceram idênticas; o banco manteve `user_version = 1`, integridade válida e nenhuma violação de chave estrangeira. Foram registradas duas observações menores (rótulo de acessibilidade com `1.5` e o texto "1 pendentes"), ainda não corrigidas. Consentimento UMP por região continua pendente por limitação do App ID de demonstração. Detalhes em [RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md](RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md).
+Atualização de 11/11/2026 — validação Android da Etapa 4 concluída e aprovada no Moto G84 5G, usando a Development Build `e11a08c0` já instalada e o Metro desta raiz, sem nova build. Os 12 passos da execução descrita no relatório de validação foram concluídos, sem que isso signifique a conclusão de todo o roteiro geral de revisão: renomear, duplicar e excluir listas, TalkBack e fonte ampliada continuam pendentes. A execução cobriu o carregamento do código das fases 1 e 2, a criação de lista sintética e o CRUD de produtos, validações, checklist, busca, ordenação, reabertura, uso sem internet externa (com o Metro conectado por USB; a inicialização sem Metro não foi testada), banner de teste somente na Home e comparação final com o baseline. As linhas da lista antiga e de seus produtos permaneceram idênticas; o banco manteve `user_version = 1`, integridade válida e nenhuma violação de chave estrangeira. Foram registradas duas observações menores (rótulo de acessibilidade com `1.5` e o texto "1 pendentes"), ainda não corrigidas. Consentimento UMP por região continua pendente por limitação do App ID de demonstração. Detalhes em [RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md](RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md).
 
 Atualização de 23/10/2026 — Etapa 4, fase 2: investigação dos alertas de dependências (5 altos, causa `node-forge`, sem correção compatível publicada identificada; nenhuma dependência alterada), trava síncrona contra repetição também nos formulários e no checklist, separação entre erro de validação e erro de gravação no formulário de lista e padrões de `.gitignore` para bancos locais, APK/AAB e chaves de assinatura. Consulte [RELATORIO-ETAPA-4-FASE-2.md](RELATORIO-ETAPA-4-FASE-2.md).
 
@@ -8,7 +8,7 @@ Atualização de 23/10/2026 — Etapa 4, fase 1: validação em runtime, detecç
 
 Estado atual: anúncios oficiais de teste com `react-native-google-mobile-ads@17.4.0`, gate UMP, revisão de privacidade quando aplicável, verificações de integridade SQLite e permissões reduzidas. Consulte [o relatório da Etapa 3](RELATORIO-ETAPA-3.md) para resultados, riscos e pendências da conta AdMob. A Development Build e11a08c0 já foi concluída e contém o módulo nativo AdMob; o Moto G84 foi atualizado via adb install -r para esse APK, com dados SQLite conferidos integralmente e banner de teste exibido. O erro RNGoogleMobileAdsModule foi resolvido. Consulte [o diagnóstico Android](DIAGNOSTICO-ADMOB.md) antes de gerar outra build. O restante deste documento mantém também registros das etapas anteriores, identificados abaixo.
 
-Retomada de 21/10/2026: busca local, organização por ordem original/pendentes/categorias e sugestões locais de produtos foram acrescentadas. A Development Build já foi instalada e testada no Android pelo usuário; os trechos sobre preparação da primeira build abaixo são o registro da etapa anterior. Consulte [o relatório da Etapa 2](RELATORIO-ETAPA-2.md) para o estado atual, verificações e roteiro de teste. Nenhuma build ou publicação foi feita nesta retomada.
+Registro histórico — retomada de 21/10/2026: busca local, organização por ordem original/pendentes/categorias e sugestões locais de produtos foram acrescentadas. A Development Build já foi instalada e testada no Android pelo usuário; os trechos sobre preparação da primeira build abaixo são o registro da etapa anterior. Consulte [o relatório da Etapa 2](RELATORIO-ETAPA-2.md) para o estado daquela etapa, verificações e roteiro de teste. Nenhuma build ou publicação foi feita nesta retomada.
 
 Aplicativo Android de listas de compras, local e offline. Sem conta, servidor, dados demonstrativos ou funcionalidades Premium. Nenhum deploy ou publicação foi realizado.
 
@@ -29,7 +29,7 @@ Com Android SDK e emulador configurados:
 npm.cmd run android
 ```
 
-O acesso à rede serve ao carregamento do ambiente de desenvolvimento. Listas e produtos usam SQLite no dispositivo e não fazem solicitações de rede. Para validar inicialização totalmente offline, use uma build Android local de desenvolvimento/release instalada; o Expo Go depende do Metro para recarregar o código durante desenvolvimento. A distribuição nativa não foi gerada nesta etapa.
+O acesso à rede serve ao carregamento do ambiente de desenvolvimento. Listas e produtos usam SQLite no dispositivo e não fazem solicitações de rede. A Development Build `e11a08c0` não embute o JavaScript e depende do Metro para iniciar, assim como o Expo Go; por isso ela não permite validar inicialização totalmente offline. Essa validação exige uma build com o bundle embutido (por exemplo, release), que não foi gerada nesta etapa.
 
 ## Development Build no Android
 
@@ -143,11 +143,11 @@ Resultado histórico da Etapa 3: typecheck e lint aprovados, 16 testes aprovados
 
 Na análise inicial, o Git estava limpo e todas as funcionalidades básicas acima já estavam implementadas. Foram corrigidas a aceitação de notações não decimais na quantidade (como `0x10` e `1e3`) e a ordem da migração, que agora recusa bancos de versão superior antes de alterar configurações. Foram acrescentados testes de regressão e validação de categoria inválida. O `expo-doctor` identificou `expo-font` como dependência obrigatória ausente de `@expo/vector-icons`; o pacote compatível e seu plugin foram adicionados pelo instalador oficial do Expo.
 
-Os testes verificam criação, renomeação, edição/remoção de produtos, marcar/desmarcar, progresso, duplicação com reset, IDs diferentes, exclusão em cascata, campos inválidos, gravações concorrentes serializadas, banco vazio, migração repetida, persistência após fechar/reabrir SQLite e rollback de falha ao duplicar. O SQLite do Node 22 emite aviso de API experimental; é usado apenas nos testes, não no app.
+Registro histórico (Etapa 3, 16 testes): os testes verificavam criação, renomeação, edição/remoção de produtos, marcar/desmarcar, progresso, duplicação com reset, IDs diferentes, exclusão em cascata, campos inválidos, gravações concorrentes serializadas, banco vazio, migração repetida, persistência após fechar/reabrir SQLite e rollback de falha ao duplicar. O SQLite do Node 22 emite aviso de API experimental; é usado apenas nos testes, não no app.
 
 ### Limites da validação
 
-Situação em 11/11/2026: a execução nativa no Moto G84 5G, incluindo persistência após encerramento real do processo e uso sem internet, foi validada conforme [o relatório de validação Android](RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md). Continuam sem revisão no dispositivo: TalkBack, fonte ampliada, aparência em tamanhos diferentes, navegação por gestos/três botões e as operações de renomear, duplicar e excluir lista. Não há suporte web validado.
+Situação em 11/11/2026: a execução nativa no Moto G84 5G, incluindo persistência após encerramento real do processo e uso sem internet externa (com o Metro conectado por USB; a inicialização sem Metro não foi testada), foi validada conforme [o relatório de validação Android](RELATORIO-VALIDACAO-ANDROID-ETAPA-4.md). Continuam sem revisão no dispositivo: TalkBack, fonte ampliada, aparência em tamanhos diferentes, navegação por gestos/três botões e as operações de renomear, duplicar e excluir lista. Não há suporte web validado.
 
 Registro histórico (Etapa 3): na época não havia Android SDK/ADB ou aparelho conectado. A exportação Android verifica bundling e resolução de módulos, mas não é uma compilação APK e não substitui a execução nativa.
 
@@ -155,7 +155,7 @@ O `npm audit` mais recente (fase 2 da Etapa 4, 23/10/2026) reporta 5 alertas alt
 
 ## Roteiro para revisão Android
 
-Roteiro geral de revisão manual. A validação de 11/11/2026 seguiu o roteiro de 12 passos do relatório de validação Android, que cobre os itens 2, 3, 4, a exclusão de produto do item 6 e o item 7. Ainda não foram executados no aparelho: renomear lista (item 1), duplicar lista (item 5), excluir lista (item 6) e o item 8.
+Roteiro geral de revisão manual. A validação de 11/11/2026 seguiu o roteiro de 12 passos do relatório de validação Android, que cobre os itens 2 e 4, a exclusão de produto do item 6, o item 7 (modo avião com o Metro conectado por USB) e, parcialmente, o item 3: quantidade zero e texto inválido foram testados no formulário de produto, mas o nome em branco foi testado na criação de lista, não na criação de produto. Ainda não foram executados no aparelho: renomear lista (item 1), duplicar lista (item 5), excluir lista (item 6) e o item 8.
 
 1. Abrir o app vazio, criar duas listas, renomear uma e voltar da checklist.
 2. Adicionar produtos com vírgula decimal, unidades e categorias; usar “Adicionar e continuar”.

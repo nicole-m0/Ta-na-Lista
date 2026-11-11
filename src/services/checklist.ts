@@ -13,3 +13,9 @@ export function visibleProducts(products: Product[], query: string, order: Produ
     (b.category ? categories.indexOf(b.category) : categories.length));
   return result;
 }
+export function formatQuantity(quantity: number) {
+  return quantity.toLocaleString('pt-BR');
+}
+export function pendingLabel(count: number) {
+  return `${count} ${count === 1 ? 'pendente' : 'pendentes'}`;
+}

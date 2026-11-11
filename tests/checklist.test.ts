@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { visibleProducts } from '../src/services/checklist.ts';
+import { formatQuantity, pendingLabel, visibleProducts } from '../src/services/checklist.ts';
 import type { Product } from '../src/types/models.ts';
 
 const products: Product[] = [
@@ -20,4 +20,15 @@ test('pending and category ordering are stable and original order can be restore
   assert.deepEqual(visibleProducts(products, '', 'category').map(p => p.id), ['2', '4', '1', '3']);
   assert.deepEqual(visibleProducts(products, '', 'original').map(p => p.id), ['1', '2', '3', '4']);
   assert.deepEqual(visibleProducts([], '', 'category'), []);
+});
+test('quantities use Brazilian decimal format for display and accessibility', () => {
+  assert.equal(formatQuantity(1), '1');
+  assert.equal(formatQuantity(1.5), '1,5');
+  assert.equal(formatQuantity(0.25), '0,25');
+  assert.equal(formatQuantity(99999), '99.999');
+});
+test('pending label agrees in number', () => {
+  assert.equal(pendingLabel(0), '0 pendentes');
+  assert.equal(pendingLabel(1), '1 pendente');
+  assert.equal(pendingLabel(2), '2 pendentes');
 });

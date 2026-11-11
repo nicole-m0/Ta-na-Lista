@@ -26,7 +26,7 @@ Preparação: 23/10/2026. Execução: 11/11/2026. **Status: concluída e aprovad
 | 11 | Anúncio e UMP | Banner adaptativo marcado **Anúncio de teste** somente na Home. Nenhuma view de anúncio nos 45 dumps de checklist, formulários, diálogos e modal. Com a rede restaurada, **Verificar anúncios novamente** recuperou o banner sem reiniciar o app. Nenhum anúncio foi tocado | Aprovado no escopo testável |
 | 12 | Comparação final | Ver tabela abaixo | Aprovado |
 
-O ensaio de toque repetido foi feito em **Adicionar e continuar**: dois toques sequenciais rápidos geraram um único produto. O segundo toque, que após o salvamento cairia sobre **Adicionar produto** com o nome já limpo, não produziu erro de validação nem duplicação; foi descartado durante a operação. Dois toques injetados exatamente simultâneos pelo ADB se anulam no Android e não servem como ensaio; essa tentativa não gerou envio.
+O ensaio de toque repetido foi feito em **Adicionar e continuar**: dois toques sequenciais rápidos resultaram em um único produto gravado, sem erro de validação visível e sem duplicação. O ensaio não permite afirmar que a trava síncrona bloqueou o segundo toque; registra apenas o resultado observado. Dois toques injetados exatamente simultâneos pelo ADB se anulam no Android e não servem como ensaio; essa tentativa não gerou envio.
 
 ### Comparação final com o baseline de 11/11
 
@@ -52,7 +52,7 @@ Nenhuma linha antiga foi alterada, removida ou recebeu produto novo. As únicas 
 
 ### Observações encontradas (sem impacto nos dados; não corrigidas)
 
-1. **Acessibilidade:** o rótulo de acessibilidade do produto anuncia a quantidade com ponto (por exemplo `Produto teste A, 1.5 kg`), enquanto a tela exibe `1,5 kg`. Origem: `accessibilityLabel` em `src/components/ProductRow.tsx`, que usa o número sem formatação pt-BR.
+1. **Acessibilidade:** no dump da interface, o rótulo de acessibilidade do produto contém a quantidade com ponto (por exemplo `Produto teste A, 1.5 kg`), enquanto a tela exibe `1,5 kg`. O TalkBack não foi executado; a leitura falada desse rótulo não foi verificada. Origem: `accessibilityLabel` em `src/components/ProductRow.tsx`, que usa o número sem formatação pt-BR.
 2. **Texto:** o checklist exibe "1 pendentes" quando há um único item pendente. Origem: `src/app/list/[id].tsx`.
 
 ### Configuração nativa observada
@@ -84,7 +84,7 @@ Antes da validação, em 11/11/2026: `npm.cmd run typecheck` e `npm.cmd run lint
 
 As seções abaixo preservam o registro de 23/10, quando o aparelho não foi reconhecido pelo ADB. A coluna "Situação" do roteiro reflete aquela data; os resultados estão na seção de 11/11 acima.
 
-## Preparação e evidências atuais
+### Preparação (23/10/2026)
 
 - Lido integralmente `RELATORIO-ETAPA-4-FASE-2.md`. Base automatizada histórica: 33 testes aprovados; isso não comprova funcionamento no Android.
 - Node local: v22.19.0. Dependências já instaladas. Não foi executada instalação ou atualização.
@@ -96,7 +96,7 @@ As seções abaixo preservam o registro de 23/10, quando o aparelho não foi rec
 - Metro iniciado nesta raiz com `npm.cmd run start:dev -- --lan`, `EXPO_OFFLINE=1` e telemetria desativada para o processo. Endpoint `http://127.0.0.1:8081/status` respondeu **`packager-status:running`**. Esse resultado comprova o servidor local, não a conexão do aparelho.
 - Aviso sobre ausência de `iosAppId` apareceu na inicialização; o projeto e a validação são Android. Não foi aplicada alteração iOS sem necessidade.
 
-## Interação solicitada e ponto de espera
+### Interação solicitada e ponto de espera (23/10/2026)
 
 Foi solicitado ao usuário:
 
@@ -107,7 +107,7 @@ Foi solicitado ao usuário:
 
 Até a confirmação, não serão executadas ações dependentes no aparelho. Nenhum app foi aberto, encerrado, reinstalado ou alterado nesta preparação.
 
-### Retomada após confirmação de conexão pelo usuário
+#### Retomada após confirmação de conexão pelo usuário (23/10/2026)
 
 O usuário informou que conectou o Moto G84 via USB e ativou a depuração. Foram realizadas duas consultas novas com `adb devices -l`, ambas com lista vazia, sem estado `device`, `unauthorized` ou `offline`.
 
@@ -117,7 +117,7 @@ Foi solicitada nova interação: desbloquear o aparelho, reconectar diretamente 
 
 O roteiro permanece no passo 1. Sem reconhecimento não foi possível identificar o binário instalado, capturar baseline SQLite, observar telas/anúncios ou executar fluxos. As listas não foram acessadas ou alteradas. Não houve geração de APK, reinstalação ou avanço de fase.
 
-## Roteiro seguro para continuidade
+### Roteiro seguro para continuidade (situação em 23/10/2026)
 
 | Ordem | Ensaio/ação | Evidência necessária | Situação |
 | --- | --- | --- | --- |
@@ -142,18 +142,18 @@ Para operações dependentes de UI, primeiro confirmar a tela/contexto; não usa
 
 Uma cópia do banco com processo ativo exige mecanismo SQLite consistente ou interrupção segura de escritores; copiar apenas o `.db` pode omitir WAL. Cópias e logs devem ficar privados em `.expo/`, sem sobrescrever os backups históricos. Não manipular as cópias antigas como se fossem baseline atual.
 
-## Limites específicos de anúncios e offline
+### Limites específicos de anúncios e offline (23/10/2026)
 
 O App ID de demonstração não valida mensagens da conta da desenvolvedora. Se um formulário não aparecer, registrar a resposta observada e não declarar aceitação/recusa regional aprovada. Sem IDs próprios, aparelho de teste UMP e configuração aplicável, esses cenários poderão permanecer pendentes. Não substituir IDs nem forçar exibição ignorando consentimento.
 
 Modo avião com bundle carregado verifica operações locais sem internet; inicialização fria de Development Build pode continuar dependendo do Metro. Separar esses resultados. Solicitar instruções de rede ao usuário com restauração posterior explicitamente confirmada, sem presumir que USB ou Wi-Fi foram desligados.
 
-## Erros e correções
+### Erros e correções (23/10/2026)
 
 Até aqui, somente erro de permissão do ADB no ambiente restrito, resolvido executando a ferramenta com acesso autorizado. Nenhum erro de aplicativo foi reproduzido. **Nenhuma correção de código foi aplicada nesta preparação.**
 
 Os cinco alertas de tooling registrados na fase 2 continuam pendências documentadas; não foram reclassificados ou corrigidos nesta preparação. Manifest/permissões/backup efetivos da instalação atual ainda precisam ser conferidos no Android.
 
-## Preservação e conclusão provisória
+### Preservação e conclusão provisória (23/10/2026)
 
 Nenhum dado SQLite do aparelho foi lido ou modificado nesta rodada. Alterações anteriores de código e documentos foram preservadas. Não foi gerado APK, efetuado deploy ou publicação. A validação permanece aberta no reconhecimento USB; o relatório deve ser atualizado com evidências reais à medida que os ensaios ocorrerem.
